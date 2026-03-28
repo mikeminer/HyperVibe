@@ -1,0 +1,1360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HyperVibe — Hyperliquid Autonomous Trading</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --bg2: #0f0f1a;
+    --bg3: #151520;
+    --bg4: #1a1a28;
+    --border: #1e1e30;
+    --border2: #252540;
+    --cyan: #00d4ff;
+    --cyan2: #00a8d0;
+    --cyan-dim: rgba(0,212,255,0.12);
+    --cyan-glow: rgba(0,212,255,0.06);
+    --green: #00ff88;
+    --green-dim: rgba(0,255,136,0.12);
+    --red: #ff3366;
+    --red-dim: rgba(255,51,102,0.12);
+    --yellow: #ffd600;
+    --yellow-dim: rgba(255,214,0,0.12);
+    --purple: #7c3aed;
+    --text: #e0e0f0;
+    --text2: #8888aa;
+    --text3: #555570;
+    --radius: 8px;
+    --font-mono: 'JetBrains Mono', monospace;
+    --font-head: 'Syne', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    height: 100vh;
+    display: grid;
+    grid-template-columns: 240px 1fr 300px;
+    grid-template-rows: 48px 1fr;
+    overflow: hidden;
+  }
+
+  /* ── Top bar ──────────────────────────────────────────────────────────── */
+  .topbar {
+    grid-column: 1 / -1;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 20px;
+  }
+
+  .logo {
+    font-family: var(--font-head);
+    font-size: 17px;
+    font-weight: 800;
+    color: var(--cyan);
+    letter-spacing: -0.5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .logo-mark {
+    width: 26px; height: 26px;
+    background: var(--cyan);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--bg);
+    font-size: 14px;
+    font-weight: 900;
+  }
+
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--text2);
+  }
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--text3);
+    display: inline-block;
+    margin-right: 5px;
+  }
+  .status-dot.on { background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+  .wallet-addr {
+    font-size: 11px;
+    color: var(--text3);
+    font-family: var(--font-mono);
+  }
+
+  .nav-tabs {
+    display: flex;
+    gap: 2px;
+    margin-left: 24px;
+  }
+  .nav-tab {
+    padding: 0 12px;
+    height: 30px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: var(--text3);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .nav-tab:hover { color: var(--text); background: var(--bg3); }
+  .nav-tab.active { color: var(--cyan); background: var(--cyan-dim); }
+
+  /* ── Left sidebar ─────────────────────────────────────────────────────── */
+  .sidebar-left {
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .sidebar-section {
+    padding: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sidebar-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .mini-btn {
+    width: 20px; height: 20px;
+    border-radius: 4px;
+    border: 1px solid var(--border2);
+    background: var(--bg3);
+    color: var(--cyan);
+    font-size: 14px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+    line-height: 1;
+  }
+  .mini-btn:hover { background: var(--cyan-dim); border-color: var(--cyan); }
+
+  .pb-item {
+    padding: 8px 10px;
+    border-radius: var(--radius);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-bottom: 4px;
+  }
+  .pb-item:hover { background: var(--bg3); border-color: var(--border2); }
+  .pb-item.active { background: var(--cyan-dim); border-color: rgba(0,212,255,0.3); }
+  .pb-name { font-size: 12px; font-weight: 500; color: var(--text); margin-bottom: 2px; }
+  .pb-meta { font-size: 10px; color: var(--text3); }
+  .pb-state {
+    display: inline-block;
+    font-size: 9px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-left: 6px;
+    background: var(--green-dim);
+    color: var(--green);
+    vertical-align: middle;
+  }
+  .pb-state.paused { background: var(--yellow-dim); color: var(--yellow); }
+
+  /* Trigger items */
+  .trig-item {
+    padding: 7px 10px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    margin-bottom: 4px;
+    font-size: 11px;
+    cursor: default;
+  }
+  .trig-name { color: var(--text); margin-bottom: 2px; font-weight: 500; }
+  .trig-meta { color: var(--text3); display: flex; gap: 6px; }
+  .badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 9px;
+    font-weight: 600;
+  }
+  .badge.code { background: rgba(124,58,237,0.2); color: #a78bfa; }
+  .badge.time { background: rgba(0,212,255,0.15); color: var(--cyan); }
+  .badge.llm  { background: rgba(0,255,136,0.12); color: var(--green); }
+  .badge.hard { background: rgba(255,51,102,0.15); color: var(--red); }
+  .badge.job  { background: rgba(255,214,0,0.12); color: var(--yellow); }
+
+  /* ── Main chat area ───────────────────────────────────────────────────── */
+  .main {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg);
+  }
+
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .chat-messages::-webkit-scrollbar { width: 4px; }
+  .chat-messages::-webkit-scrollbar-track { background: transparent; }
+  .chat-messages::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  .msg { max-width: 800px; }
+  .msg.user { align-self: flex-end; }
+  .msg.assistant { align-self: flex-start; }
+
+  .msg-bubble {
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    line-height: 1.6;
+    font-size: 13px;
+  }
+  .msg.user .msg-bubble {
+    background: var(--cyan-dim);
+    border: 1px solid rgba(0,212,255,0.25);
+    color: var(--text);
+  }
+  .msg.assistant .msg-bubble {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .msg-role {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 5px;
+  }
+  .msg.user .msg-role { text-align: right; color: var(--cyan2); }
+
+  /* Tool call display */
+  .tool-call {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 10px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    font-size: 11px;
+    color: var(--text2);
+    margin: 3px 0;
+  }
+  .tool-call::before {
+    content: '⚡';
+    font-size: 10px;
+    color: var(--yellow);
+  }
+  .tool-name { color: var(--cyan); font-weight: 600; }
+
+  /* Typing indicator */
+  .typing {
+    display: flex;
+    gap: 4px;
+    padding: 8px 12px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    width: fit-content;
+  }
+  .typing span {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--text3);
+    animation: bounce 1.2s infinite;
+  }
+  .typing span:nth-child(2) { animation-delay: 0.2s; }
+  .typing span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-6px); background: var(--cyan);} }
+
+  /* Chat input */
+  .chat-input-area {
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+    background: var(--bg2);
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+  }
+
+  .playbook-select {
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 5px;
+    color: var(--text2);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 4px 8px;
+    height: 36px;
+    cursor: pointer;
+    outline: none;
+    min-width: 120px;
+    flex-shrink: 0;
+  }
+
+  .chat-input {
+    flex: 1;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    resize: none;
+    outline: none;
+    min-height: 40px;
+    max-height: 120px;
+    transition: border-color 0.15s;
+    line-height: 1.5;
+  }
+  .chat-input:focus { border-color: var(--cyan2); }
+  .chat-input::placeholder { color: var(--text3); }
+
+  .send-btn {
+    height: 40px;
+    padding: 0 18px;
+    background: var(--cyan);
+    color: var(--bg);
+    border: none;
+    border-radius: var(--radius);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .send-btn:hover { background: var(--cyan2); }
+  .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── Right sidebar ────────────────────────────────────────────────────── */
+  .sidebar-right {
+    background: var(--bg2);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .panel-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    padding: 0 8px;
+    gap: 2px;
+  }
+  .panel-tab {
+    flex: 1;
+    height: 40px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text3);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .panel-tab:hover { color: var(--text2); }
+  .panel-tab.active { color: var(--cyan); border-bottom-color: var(--cyan); }
+
+  .panel-content { flex: 1; overflow-y: auto; padding: 12px; }
+  .panel-content::-webkit-scrollbar { width: 4px; }
+  .panel-content::-webkit-scrollbar-thumb { background: var(--border2); }
+
+  /* Approval cards */
+  .approval-card {
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    padding: 12px;
+    margin-bottom: 10px;
+  }
+  .approval-card.pending { border-left: 3px solid var(--yellow); }
+  .approval-card.approved { border-left: 3px solid var(--green); opacity: 0.6; }
+  .approval-card.rejected { border-left: 3px solid var(--red); opacity: 0.6; }
+
+  .approval-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+  .approval-coin {
+    font-family: var(--font-head);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .side-badge {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+  .side-badge.buy { background: var(--green-dim); color: var(--green); }
+  .side-badge.sell { background: var(--red-dim); color: var(--red); }
+  .approval-size { font-size: 12px; color: var(--cyan); font-weight: 600; }
+  .approval-type { font-size: 10px; color: var(--text3); }
+
+  .approval-reasoning {
+    font-size: 11px;
+    color: var(--text2);
+    line-height: 1.5;
+    margin: 8px 0;
+    max-height: 80px;
+    overflow: hidden;
+    position: relative;
+  }
+  .approval-reasoning.expanded { max-height: none; }
+  .expand-btn {
+    background: none;
+    border: none;
+    color: var(--cyan);
+    font-size: 10px;
+    cursor: pointer;
+    padding: 2px 0;
+    font-family: var(--font-mono);
+  }
+
+  .approval-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .approve-btn {
+    padding: 7px;
+    border-radius: 5px;
+    border: 1px solid rgba(0,255,136,0.3);
+    background: var(--green-dim);
+    color: var(--green);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .approve-btn:hover { background: rgba(0,255,136,0.2); border-color: var(--green); }
+  .reject-btn {
+    padding: 7px;
+    border-radius: 5px;
+    border: 1px solid rgba(255,51,102,0.3);
+    background: var(--red-dim);
+    color: var(--red);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .reject-btn:hover { background: rgba(255,51,102,0.2); border-color: var(--red); }
+
+  /* Market ticker */
+  .ticker-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .ticker-coin { font-weight: 600; color: var(--text); }
+  .ticker-price { color: var(--text2); }
+  .ticker-change { font-size: 11px; font-weight: 600; }
+  .ticker-change.pos { color: var(--green); }
+  .ticker-change.neg { color: var(--red); }
+
+  /* Trade journal rows */
+  .trade-row {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+  }
+  .trade-header { display: flex; justify-content: space-between; margin-bottom: 2px; }
+  .trade-coin { font-weight: 600; color: var(--text); }
+  .trade-pnl.pos { color: var(--green); }
+  .trade-pnl.neg { color: var(--red); }
+  .trade-meta { color: var(--text3); font-size: 10px; }
+
+  /* Empty state */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    color: var(--text3);
+    text-align: center;
+    gap: 8px;
+  }
+  .empty-icon { font-size: 28px; margin-bottom: 4px; }
+  .empty-text { font-size: 12px; line-height: 1.5; }
+
+  /* Notifications */
+  .notifications {
+    position: fixed;
+    bottom: 16px;
+    right: 316px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 100;
+  }
+  .notif {
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    font-size: 12px;
+    min-width: 240px;
+    animation: slideIn 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .notif.success { border-left: 3px solid var(--green); }
+  .notif.error { border-left: 3px solid var(--red); }
+  .notif.info { border-left: 3px solid var(--cyan); }
+  @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+  /* Modal overlay */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: 12px;
+    padding: 24px;
+    width: 520px;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  .modal h2 { font-family: var(--font-head); font-size: 18px; color: var(--cyan); margin-bottom: 16px; }
+  .form-group { margin-bottom: 14px; }
+  .form-label { display: block; font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--text3); margin-bottom: 6px; }
+  .form-input, .form-textarea, .form-select {
+    width: 100%;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 8px 12px;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .form-input:focus, .form-textarea:focus, .form-select:focus { border-color: var(--cyan); }
+  .form-textarea { resize: vertical; min-height: 80px; }
+  .form-select { cursor: pointer; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
+  .btn { padding: 8px 20px; border-radius: 6px; border: none; font-family: var(--font-mono); font-size: 12px; font-weight: 600; cursor: pointer; }
+  .btn-primary { background: var(--cyan); color: var(--bg); }
+  .btn-primary:hover { background: var(--cyan2); }
+  .btn-cancel { background: var(--bg3); color: var(--text2); border: 1px solid var(--border2); }
+  .btn-cancel:hover { color: var(--text); }
+
+  /* Pending count badge */
+  .count-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    background: var(--yellow);
+    color: var(--bg);
+    border-radius: 8px;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 0 4px;
+    margin-left: 5px;
+  }
+
+  .text-green { color: var(--green); }
+  .text-red { color: var(--red); }
+  .text-cyan { color: var(--cyan); }
+  .text-dim { color: var(--text2); }
+  .text-muted { color: var(--text3); }
+
+  /* Scrollable left sidebar sections */
+  .sidebar-scroll { flex: 1; overflow-y: auto; }
+  .sidebar-scroll::-webkit-scrollbar { width: 3px; }
+  .sidebar-scroll::-webkit-scrollbar-thumb { background: var(--border2); }
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<header class="topbar">
+  <div class="logo">
+    <div class="logo-mark">H</div>
+    HyperVibe
+  </div>
+
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="switchView('chat')">Chat</button>
+    <button class="nav-tab" onclick="switchView('market')">Market</button>
+    <button class="nav-tab" onclick="switchView('journal')">Journal</button>
+  </div>
+
+  <div class="status-bar">
+    <span id="account-equity" style="color:var(--green);font-weight:600;display:none"></span>
+    <span id="account-pnl" style="display:none"></span>
+    <span id="hb-status"><span class="status-dot"></span>Connecting...</span>
+    <span class="wallet-addr" id="wallet-display">—</span>
+    <span id="network-badge" style="color:var(--text3);font-size:11px">—</span>
+  </div>
+</header>
+
+<!-- Left sidebar -->
+<aside class="sidebar-left">
+  <div class="sidebar-section">
+    <div class="sidebar-label">
+      Playbooks
+      <button class="mini-btn" onclick="openCreatePlaybook()" title="New playbook">+</button>
+    </div>
+    <div id="playbooks-list">
+      <div class="empty-state"><div class="empty-text">No playbooks yet.<br>Ask the agent to create one.</div></div>
+    </div>
+  </div>
+  <div class="sidebar-section sidebar-scroll">
+    <div class="sidebar-label">
+      Triggers
+      <button class="mini-btn" onclick="openCreateTrigger()" title="New trigger">+</button>
+    </div>
+    <div id="triggers-list">
+      <div class="empty-state"><div class="empty-text">No active triggers.</div></div>
+    </div>
+  </div>
+</aside>
+
+<!-- Main area -->
+<main class="main" id="main-chat">
+  <div class="chat-messages" id="chat-messages">
+    <div style="margin: auto; text-align: center; color: var(--text3); padding: 60px 20px;">
+      <div style="font-family: var(--font-head); font-size: 28px; font-weight: 800; color: var(--text2); margin-bottom: 12px;">HyperVibe</div>
+      <div style="font-size: 13px; line-height: 1.7; max-width: 380px; margin: 0 auto;">
+        The agentic harness for autonomous Hyperliquid trading.<br>
+        <span style="color: var(--cyan);">Talk to your portfolio.</span> Create playbooks in chat. Watch triggers fire in real time.
+      </div>
+      <div style="margin-top: 24px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;">
+        <button class="prompt-chip" onclick="sendPrompt('What are my current positions and unrealized PnL?')">Show my positions</button>
+        <button class="prompt-chip" onclick="sendPrompt('What is the current funding rate for BTC and ETH?')">Funding rates</button>
+        <button class="prompt-chip" onclick="sendPrompt('Run a technical analysis on HYPE — RSI, MACD, and Bollinger Bands on the 4h chart.')">Analyse HYPE</button>
+        <button class="prompt-chip" onclick="sendPrompt('What are the top movers on Hyperliquid right now?')">Top movers</button>
+        <button class="prompt-chip" onclick="sendPrompt('Show me my account equity and available margin.')">Account value</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="chat-input-area">
+    <select class="playbook-select" id="playbook-select">
+      <option value="">No playbook</option>
+    </select>
+    <textarea class="chat-input" id="chat-input" placeholder="Ask the agent anything..." rows="1"
+      onkeydown="handleInputKey(event)" oninput="autoResize(this)"></textarea>
+    <button class="send-btn" id="send-btn" onclick="sendMessage()">Send ↑</button>
+  </div>
+</main>
+
+<!-- Right sidebar -->
+<aside class="sidebar-right">
+  <div class="panel-tabs">
+    <button class="panel-tab active" onclick="switchPanel('approvals')">Approvals<span class="count-badge" id="pending-count" style="display:none">0</span></button>
+    <button class="panel-tab" onclick="switchPanel('market')">Market</button>
+    <button class="panel-tab" onclick="switchPanel('journal')">Journal</button>
+  </div>
+  <div class="panel-content" id="panel-approvals">
+    <div class="empty-state">
+      <div class="empty-icon">✓</div>
+      <div class="empty-text">No pending approvals.<br>Trade requests from the agent will appear here.</div>
+    </div>
+  </div>
+  <div class="panel-content" id="panel-market" style="display:none">
+    <div id="market-content"><div class="empty-state"><div class="empty-text">Loading market data...</div></div></div>
+  </div>
+  <div class="panel-content" id="panel-journal" style="display:none">
+    <div id="journal-content"><div class="empty-state"><div class="empty-icon">📂</div><div class="empty-text">No trades recorded yet.</div></div></div>
+  </div>
+</aside>
+
+<!-- Notifications -->
+<div class="notifications" id="notifications"></div>
+
+<!-- Create Playbook Modal -->
+<div class="modal-overlay" id="modal-playbook">
+  <div class="modal">
+    <h2>New Playbook</h2>
+    <div class="form-group">
+      <label class="form-label">Name</label>
+      <input class="form-input" id="pb-name" placeholder="e.g. HYPE Momentum">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Description</label>
+      <input class="form-input" id="pb-desc" placeholder="Brief description">
+    </div>
+    <div class="form-group">
+      <label class="form-label">USDC Allocation</label>
+      <input class="form-input" id="pb-alloc" type="number" placeholder="1000">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Strategy Plan (markdown)</label>
+      <textarea class="form-textarea" id="pb-plan" style="min-height:120px" placeholder="Describe your strategy: entry rules, exit criteria, risk management, position sizing..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-cancel" onclick="closeModal('modal-playbook')">Cancel</button>
+      <button class="btn btn-primary" onclick="createPlaybook()">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Create Trigger Modal -->
+<div class="modal-overlay" id="modal-trigger">
+  <div class="modal">
+    <h2>New Trigger</h2>
+    <div class="form-group">
+      <label class="form-label">Name</label>
+      <input class="form-input" id="tr-name" placeholder="e.g. BTC Stop Loss">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Condition Mode</label>
+      <select class="form-select" id="tr-mode" onchange="updateTriggerHelp()">
+        <option value="code">code — JavaScript expression</option>
+        <option value="time">time — Cron schedule</option>
+        <option value="llm">llm — Natural language (Haiku)</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Condition Expression</label>
+      <input class="form-input" id="tr-expr" placeholder='prices["BTC"] <= 90000'>
+      <div id="tr-expr-help" style="font-size:10px;color:var(--text3);margin-top:4px">JS: access prices["COIN"]. Returns true to fire.</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Watch Coins (comma separated)</label>
+      <input class="form-input" id="tr-coins" placeholder="BTC, ETH, HYPE">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Action Type</label>
+      <select class="form-select" id="tr-action">
+        <option value="reasoning_job">reasoning_job — Wake the agent to analyse</option>
+        <option value="hard_order">hard_order — Execute immediately (stops/targets)</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Context / Notes</label>
+      <input class="form-input" id="tr-context" placeholder="Why this trigger exists">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-cancel" onclick="closeModal('modal-trigger')">Cancel</button>
+      <button class="btn btn-primary" onclick="createTrigger()">Create</button>
+    </div>
+  </div>
+</div>
+
+<style>
+  .prompt-chip {
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 20px;
+    color: var(--text2);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 6px 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .prompt-chip:hover { border-color: var(--cyan); color: var(--cyan); background: var(--cyan-dim); }
+</style>
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────────
+
+let ws = null;
+let reconnectTimer = null;
+let isAgentTyping = false;
+let currentAssistantMsg = null;
+let playbooks = [];
+let triggers = [];
+let approvals = [];
+let marketData = {};
+let activePanel = 'approvals';
+
+// ── WebSocket ─────────────────────────────────────────────────────────────────
+
+function connect() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(`${proto}//${location.host}`);
+
+  ws.onopen = () => {
+    setStatus(true);
+    clearTimeout(reconnectTimer);
+  };
+
+  ws.onclose = () => {
+    setStatus(false);
+    reconnectTimer = setTimeout(connect, 3000);
+  };
+
+  ws.onmessage = (evt) => {
+    let data;
+    try { data = JSON.parse(evt.data); } catch { return; }
+    handleWsMessage(data);
+  };
+
+  ws.onerror = () => ws.close();
+}
+
+function handleWsMessage(data) {
+  switch (data.type) {
+    case 'init':
+      initState(data);
+      break;
+    case 'agent_chunk':
+      handleChunk(data.chunk);
+      break;
+    case 'approval_queued':
+      approvals.unshift(data.approval);
+      renderApprovals();
+      notify('Trade queued for approval', 'info');
+      break;
+    case 'approval_resolved':
+      updateApproval(data.approval);
+      renderApprovals();
+      break;
+    case 'trade_executed':
+      notify(`✓ Trade executed: ${data.approval.side} ${data.approval.size} ${data.approval.coin}`, 'success');
+      loadJournal();
+      break;
+    case 'trade_error':
+      notify(`✗ Trade failed: ${data.error}`, 'error');
+      break;
+    case 'heartbeat_tick':
+      break;
+    case 'trigger_fired':
+      notify(`⚡ Trigger fired: ${data.trigger.name}`, 'info');
+      break;
+    case 'error':
+      finishAssistant();
+      notify(`Error: ${data.message}`, 'error');
+      break;
+  }
+}
+
+function send(data) {
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify(data));
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+
+function initState(data) {
+  if (data.wallet) {
+    document.getElementById('wallet-display').textContent =
+      data.wallet.slice(0, 6) + '…' + data.wallet.slice(-4);
+  }
+  document.getElementById('network-badge').textContent = data.network ?? '';
+  playbooks = data.playbooks ?? [];
+  triggers = data.triggers ?? [];
+  approvals = data.pendingApprovals ?? [];
+  renderPlaybooks();
+  renderTriggers();
+  renderApprovals();
+  loadMarket();
+}
+
+function setStatus(online) {
+  const el = document.getElementById('hb-status');
+  el.innerHTML = online
+    ? '<span class="status-dot on"></span>Heartbeat live'
+    : '<span class="status-dot"></span>Reconnecting...';
+}
+
+// ── Chat ──────────────────────────────────────────────────────────────────────
+
+function sendMessage() {
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text || isAgentTyping) return;
+
+  const playbookId = document.getElementById('playbook-select').value || null;
+
+  addMessage('user', text);
+  input.value = '';
+  input.style.height = 'auto';
+
+  startTyping();
+  send({ type: 'chat', text, playbookId });
+}
+
+function sendPrompt(text) {
+  document.getElementById('chat-input').value = text;
+  sendMessage();
+}
+
+function handleInputKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+function addMessage(role, text) {
+  const msgs = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  div.innerHTML = `
+    <div class="msg-role">${role === 'user' ? 'You' : 'HyperVibe'}</div>
+    <div class="msg-bubble">${escHtml(text)}</div>
+  `;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  return div;
+}
+
+function startTyping() {
+  isAgentTyping = true;
+  document.getElementById('send-btn').disabled = true;
+
+  const msgs = document.getElementById('chat-messages');
+
+  // Create assistant message container
+  currentAssistantMsg = document.createElement('div');
+  currentAssistantMsg.className = 'msg assistant';
+  currentAssistantMsg.innerHTML = `
+    <div class="msg-role">HyperVibe</div>
+    <div class="msg-bubble" id="streaming-bubble">
+      <div class="typing"><span></span><span></span><span></span></div>
+    </div>
+  `;
+  msgs.appendChild(currentAssistantMsg);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+let _streamText = '';
+
+function handleChunk(chunk) {
+  if (!currentAssistantMsg) return;
+  const bubble = currentAssistantMsg.querySelector('#streaming-bubble');
+
+  if (chunk.type === 'text') {
+    _streamText += chunk.text;
+    bubble.innerHTML = formatText(_streamText);
+  } else if (chunk.type === 'tool_call') {
+    // Show tool call inline
+    const tc = document.createElement('div');
+    tc.className = 'tool-call';
+    tc.innerHTML = `<span class="tool-name">${escHtml(chunk.tool)}</span> <span style="color:var(--text3)">${escHtml(JSON.stringify(chunk.input).slice(0, 80))}${JSON.stringify(chunk.input).length > 80 ? '…' : ''}</span>`;
+    bubble.appendChild(tc);
+  } else if (chunk.type === 'done') {
+    finishAssistant();
+  }
+
+  document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
+}
+
+function finishAssistant() {
+  isAgentTyping = false;
+  _streamText = '';
+  currentAssistantMsg = null;
+  document.getElementById('send-btn').disabled = false;
+}
+
+function formatText(text) {
+  return text
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/`(.*?)`/g, '<code style="background:var(--bg3);padding:1px 5px;border-radius:3px;color:var(--cyan)">$1</code>')
+    .replace(/\n/g, '<br>');
+}
+
+function escHtml(str) {
+  return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Playbooks ─────────────────────────────────────────────────────────────────
+
+function renderPlaybooks() {
+  const el = document.getElementById('playbooks-list');
+  const sel = document.getElementById('playbook-select');
+
+  // Update select
+  sel.innerHTML = '<option value="">No playbook</option>';
+  for (const pb of playbooks) {
+    sel.innerHTML += `<option value="${pb.id}">${pb.name}</option>`;
+  }
+
+  if (playbooks.length === 0) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-text">No playbooks yet.</div></div>';
+    return;
+  }
+
+  el.innerHTML = playbooks.map(pb => `
+    <div class="pb-item" onclick="selectPlaybook('${pb.id}')">
+      <div class="pb-name">${escHtml(pb.name)}<span class="pb-state ${pb.state === 'paused' ? 'paused' : ''}">${pb.state}</span></div>
+      <div class="pb-meta">$${pb.allocation} USDC</div>
+    </div>
+  `).join('');
+}
+
+function selectPlaybook(id) {
+  document.getElementById('playbook-select').value = id;
+  document.querySelectorAll('.pb-item').forEach(el => el.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+}
+
+async function openCreatePlaybook() {
+  document.getElementById('modal-playbook').classList.add('open');
+}
+
+async function createPlaybook() {
+  const name = document.getElementById('pb-name').value.trim();
+  const desc = document.getElementById('pb-desc').value.trim();
+  const alloc = parseFloat(document.getElementById('pb-alloc').value) || 0;
+  const plan = document.getElementById('pb-plan').value.trim();
+  if (!name || !plan) { notify('Name and plan are required', 'error'); return; }
+
+  const res = await fetch('/api/playbooks', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, description: desc, allocation: alloc, plan }),
+  });
+  const pb = await res.json();
+  playbooks.unshift(pb);
+  renderPlaybooks();
+  closeModal('modal-playbook');
+  notify(`Playbook created: ${pb.name}`, 'success');
+}
+
+// ── Triggers ──────────────────────────────────────────────────────────────────
+
+function renderTriggers() {
+  const el = document.getElementById('triggers-list');
+  if (triggers.length === 0) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-text">No active triggers.</div></div>';
+    return;
+  }
+  el.innerHTML = triggers.map(t => `
+    <div class="trig-item">
+      <div class="trig-name">${escHtml(t.name)}</div>
+      <div class="trig-meta">
+        <span class="badge ${t.condition_mode}">${t.condition_mode}</span>
+        <span class="badge ${t.action_type === 'hard_order' ? 'hard' : 'job'}">${t.action_type === 'hard_order' ? 'hard_order' : 'job'}</span>
+        <span style="margin-left:auto;color:var(--text3);font-size:10px">×${t.fire_count ?? 0}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function openCreateTrigger() {
+  document.getElementById('modal-trigger').classList.add('open');
+}
+
+function updateTriggerHelp() {
+  const mode = document.getElementById('tr-mode').value;
+  const help = document.getElementById('tr-expr-help');
+  const input = document.getElementById('tr-expr');
+  if (mode === 'code') {
+    help.textContent = 'JS expression using prices["COIN"]. Returns true to fire.';
+    input.placeholder = 'prices["BTC"] <= 90000';
+  } else if (mode === 'time') {
+    help.textContent = 'Cron expression (min hour dom mon dow).';
+    input.placeholder = '0 9 * * 1-5';
+  } else {
+    help.textContent = 'Natural language yes/no question evaluated by Claude Haiku.';
+    input.placeholder = 'Is BTC showing unusual volatility?';
+  }
+}
+
+async function createTrigger() {
+  const name = document.getElementById('tr-name').value.trim();
+  const mode = document.getElementById('tr-mode').value;
+  const expr = document.getElementById('tr-expr').value.trim();
+  const coins = document.getElementById('tr-coins').value.split(',').map(s => s.trim()).filter(Boolean);
+  const action = document.getElementById('tr-action').value;
+  const context = document.getElementById('tr-context').value.trim();
+  if (!name || !expr) { notify('Name and expression are required', 'error'); return; }
+
+  const res = await fetch('/api/triggers', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, condition_mode: mode, condition_expr: expr, watch_coins: coins, action_type: action, context }),
+  });
+  const t = await res.json();
+  triggers.unshift(t);
+  renderTriggers();
+  closeModal('modal-trigger');
+  notify(`Trigger created: ${t.name}`, 'success');
+}
+
+// ── Approvals ─────────────────────────────────────────────────────────────────
+
+function renderApprovals() {
+  const pending = approvals.filter(a => a.status === 'pending');
+  const countEl = document.getElementById('pending-count');
+  if (pending.length > 0) {
+    countEl.textContent = pending.length;
+    countEl.style.display = 'inline-flex';
+  } else {
+    countEl.style.display = 'none';
+  }
+
+  if (activePanel !== 'approvals') return;
+
+  const el = document.getElementById('panel-approvals');
+  if (approvals.length === 0) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">✓</div><div class="empty-text">No pending approvals.<br>Trade requests from the agent will appear here.</div></div>`;
+    return;
+  }
+
+  el.innerHTML = approvals.slice(0, 20).map(a => `
+    <div class="approval-card ${a.status}">
+      <div class="approval-header">
+        <div class="approval-coin">${escHtml(a.coin)}</div>
+        <div class="side-badge ${a.side?.toLowerCase() === 'buy' ? 'buy' : 'sell'}">${a.side}</div>
+        <div class="approval-size">${a.size}</div>
+        <div class="approval-type">${a.order_type}</div>
+      </div>
+      <div class="approval-reasoning" id="reason-${a.id}">${escHtml(a.reasoning)}</div>
+      ${a.reasoning?.length > 150 ? `<button class="expand-btn" onclick="toggleReason('${a.id}')">Show more ↓</button>` : ''}
+      ${a.status === 'pending' ? `
+        <div class="approval-actions">
+          <button class="approve-btn" onclick="resolveApproval('${a.id}', 'approve')">✓ Approve</button>
+          <button class="reject-btn" onclick="resolveApproval('${a.id}', 'reject')">✗ Reject</button>
+        </div>
+      ` : `<div style="font-size:10px;color:var(--text3);margin-top:8px;text-transform:uppercase;letter-spacing:1px">${a.status}</div>`}
+    </div>
+  `).join('');
+}
+
+function toggleReason(id) {
+  const el = document.getElementById(`reason-${id}`);
+  const btn = el.nextElementSibling;
+  el.classList.toggle('expanded');
+  if (btn && btn.classList.contains('expand-btn')) {
+    btn.textContent = el.classList.contains('expanded') ? 'Show less ↑' : 'Show more ↓';
+  }
+}
+
+async function resolveApproval(id, action) {
+  const endpoint = `/api/approvals/${id}/${action}`;
+  const btn = event.currentTarget;
+  btn.disabled = true;
+  btn.textContent = '...';
+
+  try {
+    const res = await fetch(endpoint, { method: 'POST' });
+    const data = await res.json();
+    updateApproval({ ...data.approval, ...data });
+    renderApprovals();
+    if (action === 'approve') {
+      if (data.txResult?.error) notify(`Trade error: ${data.txResult.error}`, 'error');
+      else notify('Trade submitted to Hyperliquid', 'success');
+    }
+  } catch (err) {
+    notify(`Request failed: ${err.message}`, 'error');
+    btn.disabled = false;
+  }
+}
+
+function updateApproval(updated) {
+  const idx = approvals.findIndex(a => a.id === updated.id);
+  if (idx >= 0) approvals[idx] = { ...approvals[idx], ...updated };
+  else approvals.unshift(updated);
+}
+
+// ── Market panel ──────────────────────────────────────────────────────────────
+
+async function loadMarket() {
+  try {
+    const res = await fetch('/api/market/top-movers');
+    const data = await res.json();
+    marketData = data;
+    if (activePanel === 'market') renderMarket();
+  } catch {}
+  setTimeout(loadMarket, 30_000);
+}
+
+function renderMarket() {
+  const el = document.getElementById('market-content');
+  const { gainers = [], losers = [] } = marketData;
+  const all = [...gainers.slice(0,5), ...losers.slice(0,5)].sort((a, b) => b.change24h - a.change24h);
+
+  if (all.length === 0) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-text">Loading...</div></div>';
+    return;
+  }
+
+  el.innerHTML = `
+    <div style="margin-bottom:8px;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text3)">Top movers · 24h</div>
+    ${all.map(c => `
+      <div class="ticker-row">
+        <div class="ticker-coin">${c.coin}</div>
+        <div class="ticker-price">$${formatPrice(c.price)}</div>
+        <div class="ticker-change ${c.change24h >= 0 ? 'pos' : 'neg'}">${c.change24h >= 0 ? '+' : ''}${c.change24h.toFixed(2)}%</div>
+      </div>
+    `).join('')}
+  `;
+}
+
+async function loadJournal() {
+  try {
+    const res = await fetch('/api/learnings/trades?limit=30');
+    const trades = await res.json();
+    const el = document.getElementById('journal-content');
+    if (trades.length === 0) {
+      el.innerHTML = '<div class="empty-state"><div class="empty-icon">📂</div><div class="empty-text">No trades recorded yet.</div></div>';
+      return;
+    }
+    el.innerHTML = trades.map(t => {
+      const pnl = parseFloat(t.closed_pnl ?? 0);
+      return `
+        <div class="trade-row">
+          <div class="trade-header">
+            <span class="trade-coin">${t.side} ${t.size} ${t.coin}</span>
+            <span class="trade-pnl ${pnl >= 0 ? 'pos' : 'neg'}">${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}</span>
+          </div>
+          <div class="trade-meta">@ ${formatPrice(t.price)} · ${new Date(t.filled_at).toLocaleString()}</div>
+          ${t.note ? `<div style="color:var(--text3);font-size:10px;margin-top:3px;line-height:1.4">${escHtml(t.note.slice(0, 80))}${t.note.length > 80 ? '…' : ''}</div>` : ''}
+        </div>
+      `;
+    }).join('');
+  } catch {}
+}
+
+// ── Panel switching ───────────────────────────────────────────────────────────
+
+function switchPanel(panel) {
+  activePanel = panel;
+  document.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  document.querySelectorAll('.panel-content').forEach(p => p.style.display = 'none');
+  document.getElementById(`panel-${panel}`).style.display = 'block';
+
+  if (panel === 'approvals') renderApprovals();
+  if (panel === 'market') { renderMarket(); }
+  if (panel === 'journal') loadJournal();
+}
+
+function switchView(view) {
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  // For now just switch panel to match
+  if (view === 'journal') switchPanel('journal');
+  if (view === 'market') switchPanel('market');
+  if (view === 'chat') switchPanel('approvals');
+}
+
+// ── Modals ────────────────────────────────────────────────────────────────────
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+// Close modal on overlay click
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.classList.remove('open');
+  });
+});
+
+// ── Notifications ─────────────────────────────────────────────────────────────
+
+function notify(text, type = 'info') {
+  const el = document.createElement('div');
+  el.className = `notif ${type}`;
+  el.textContent = text;
+  document.getElementById('notifications').appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+function formatPrice(p) {
+  const n = parseFloat(p);
+  if (n >= 1000) return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (n >= 1) return n.toFixed(4);
+  return n.toPrecision(4);
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+
+connect();
+loadMarket();
+
+async function pollAccount() {
+  try {
+    const res = await fetch('/api/account/value');
+    if (res.ok) {
+      const data = await res.json();
+      const eq = document.getElementById('account-equity');
+      const pnl = document.getElementById('account-pnl');
+      if (data.accountValue !== undefined) {
+        eq.textContent = `$${data.accountValue.toFixed(2)}`;
+        eq.style.display = '';
+        const upnl = data.totalNtlPos ? (data.accountValue - (data.accountValue - data.totalNtlPos)) : null;
+        if (data.totalMarginUsed > 0) {
+          pnl.textContent = `${((data.totalMarginUsed / data.accountValue) * 100).toFixed(1)}% margin`;
+          pnl.style.color = 'var(--text2)';
+          pnl.style.display = '';
+        }
+      }
+    }
+  } catch {}
+}
+
+pollAccount();
+setInterval(pollAccount, 15_000);
+</script>
+</body>
+</html>

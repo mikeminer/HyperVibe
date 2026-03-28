@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HyperVibe — The agentic harness for Hyperliquid</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Syne:wght@400;500;600;700;800&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #08080e;
+    --bg2: #0d0d18;
+    --bg3: #121220;
+    --border: #1a1a2e;
+    --border2: #22223a;
+    --cyan: #00d4ff;
+    --cyan2: #009ec0;
+    --cyan-dim: rgba(0,212,255,0.1);
+    --green: #00ff88;
+    --red: #ff3355;
+    --yellow: #ffd600;
+    --text: #d8d8f0;
+    --text2: #8080a8;
+    --text3: #444460;
+    --r: 8px;
+    --font-mono: 'JetBrains Mono', monospace;
+    --font-head: 'Syne', sans-serif;
+    --font-serif: 'DM Serif Display', serif;
+    --sidebar-w: 220px;
+    --content-max: 720px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 14px;
+    line-height: 1.7;
+    display: grid;
+    grid-template-columns: var(--sidebar-w) 1fr;
+    min-height: 100vh;
+  }
+
+  /* ── Sidebar ────────────────────────────────────────────────────────────── */
+  nav {
+    position: fixed;
+    top: 0; left: 0;
+    width: var(--sidebar-w);
+    height: 100vh;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 24px 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .nav-logo {
+    padding: 0 20px 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+  .nav-logo-mark {
+    font-family: var(--font-head);
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--cyan);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .nav-logo-mark span {
+    width: 24px; height: 24px;
+    background: var(--cyan);
+    border-radius: 5px;
+    color: var(--bg);
+    font-size: 13px;
+    font-weight: 900;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .nav-version {
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: 0.5px;
+  }
+  .nav-links-badge {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .nav-badge {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: var(--cyan-dim);
+    color: var(--cyan2);
+    text-decoration: none;
+    border: 1px solid rgba(0,212,255,0.2);
+    transition: all 0.15s;
+  }
+  .nav-badge:hover { background: rgba(0,212,255,0.15); }
+
+  .nav-section-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text3);
+    padding: 12px 20px 6px;
+  }
+
+  .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 20px;
+    font-size: 12px;
+    color: var(--text2);
+    text-decoration: none;
+    transition: all 0.15s;
+    border-left: 2px solid transparent;
+  }
+  .nav-link:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+  .nav-link.active { color: var(--cyan); border-left-color: var(--cyan); background: var(--cyan-dim); }
+  .nav-link .ico { font-size: 12px; width: 16px; text-align: center; }
+
+  .nav-run-btn {
+    margin: 16px 20px 0;
+    padding: 10px;
+    background: var(--cyan);
+    color: var(--bg);
+    border: none;
+    border-radius: var(--r);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    text-align: center;
+    text-decoration: none;
+    display: block;
+    transition: background 0.15s;
+  }
+  .nav-run-btn:hover { background: var(--cyan2); }
+
+  /* ── Content ────────────────────────────────────────────────────────────── */
+  main {
+    margin-left: var(--sidebar-w);
+    padding: 0 0 120px;
+  }
+
+  /* Hero */
+  .hero {
+    padding: 80px 60px 60px;
+    border-bottom: 1px solid var(--border);
+    max-width: 860px;
+  }
+
+  .hero-tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--cyan);
+    background: var(--cyan-dim);
+    border: 1px solid rgba(0,212,255,0.2);
+    padding: 4px 12px;
+    border-radius: 20px;
+    margin-bottom: 24px;
+  }
+
+  .hero h1 {
+    font-family: var(--font-serif);
+    font-size: 56px;
+    font-weight: 400;
+    line-height: 1.1;
+    color: var(--text);
+    margin-bottom: 20px;
+  }
+  .hero h1 em { color: var(--cyan); font-style: italic; }
+
+  .hero-sub {
+    font-size: 16px;
+    color: var(--text2);
+    line-height: 1.6;
+    max-width: 540px;
+    margin-bottom: 32px;
+  }
+
+  .hero-chips {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 32px;
+  }
+  .chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 20px;
+    font-size: 12px;
+    color: var(--text2);
+  }
+  .chip .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+  }
+
+  .terminal {
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: var(--r);
+    padding: 20px 24px;
+    font-size: 13px;
+    font-family: var(--font-mono);
+    color: var(--text2);
+    max-width: 480px;
+  }
+  .terminal .prompt { color: var(--cyan); }
+  .terminal .comment { color: var(--text3); }
+  .terminal .ok { color: var(--green); }
+
+  /* Sections */
+  .doc-section {
+    padding: 64px 60px;
+    border-bottom: 1px solid var(--border);
+    max-width: 860px;
+  }
+
+  .section-num {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 8px;
+  }
+  .section-num .tag {
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-left: 8px;
+  }
+
+  h2 {
+    font-family: var(--font-serif);
+    font-size: 36px;
+    font-weight: 400;
+    color: var(--text);
+    margin-bottom: 16px;
+    line-height: 1.2;
+  }
+
+  h3 {
+    font-family: var(--font-head);
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+    margin: 32px 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  h3::before { content: ''; display: block; width: 16px; height: 1px; background: var(--border2); }
+
+  p {
+    color: var(--text2);
+    margin-bottom: 14px;
+    max-width: 620px;
+  }
+
+  /* Feature grid */
+  .features {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 28px 0;
+  }
+  .feature-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 20px;
+    transition: border-color 0.2s;
+  }
+  .feature-card:hover { border-color: var(--border2); }
+  .feature-icon { font-size: 20px; margin-bottom: 10px; }
+  .feature-title {
+    font-family: var(--font-head);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+  .feature-desc { font-size: 12px; color: var(--text2); line-height: 1.5; }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+    font-size: 12px;
+  }
+  th {
+    text-align: left;
+    padding: 8px 12px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text3);
+    border-bottom: 1px solid var(--border2);
+  }
+  td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text2);
+    vertical-align: top;
+  }
+  td:first-child { color: var(--cyan); font-weight: 500; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.01); }
+
+  /* Code blocks */
+  pre {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 20px;
+    overflow-x: auto;
+    margin: 16px 0;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  code { color: var(--cyan); }
+  pre code { color: var(--text2); }
+  .kw { color: var(--cyan); }
+  .str { color: var(--green); }
+  .cmt { color: var(--text3); font-style: italic; }
+  .num { color: var(--yellow); }
+
+  /* Flow diagram */
+  .flow {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin: 28px 0;
+  }
+  .flow-step {
+    display: grid;
+    grid-template-columns: 48px 1fr;
+    gap: 0;
+    position: relative;
+  }
+  .flow-step::before {
+    content: '';
+    position: absolute;
+    left: 23px;
+    top: 40px;
+    width: 2px;
+    height: calc(100% - 8px);
+    background: var(--border2);
+  }
+  .flow-step:last-child::before { display: none; }
+  .flow-num {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text3);
+    margin: 4px 8px 0 0;
+    flex-shrink: 0;
+    z-index: 1;
+  }
+  .flow-body {
+    padding: 0 0 28px 16px;
+  }
+  .flow-title {
+    font-family: var(--font-head);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .flow-desc { font-size: 12px; color: var(--text2); line-height: 1.5; }
+
+  /* Callout */
+  .callout {
+    background: var(--cyan-dim);
+    border: 1px solid rgba(0,212,255,0.2);
+    border-radius: var(--r);
+    padding: 16px 20px;
+    margin: 20px 0;
+    font-size: 12px;
+    color: var(--text2);
+    display: flex;
+    gap: 10px;
+  }
+  .callout-icon { color: var(--cyan); flex-shrink: 0; }
+
+  /* Badge variants */
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+  .badge-cyan { background: var(--cyan-dim); color: var(--cyan); border: 1px solid rgba(0,212,255,0.25); }
+  .badge-green { background: rgba(0,255,136,0.12); color: var(--green); border: 1px solid rgba(0,255,136,0.25); }
+  .badge-red { background: rgba(255,51,85,0.12); color: var(--red); border: 1px solid rgba(255,51,85,0.2); }
+  .badge-yellow { background: rgba(255,214,0,0.12); color: var(--yellow); border: 1px solid rgba(255,214,0,0.2); }
+  .badge-purple { background: rgba(124,58,237,0.15); color: #a78bfa; border: 1px solid rgba(124,58,237,0.3); }
+
+  .no-approval { color: var(--text3); font-style: italic; }
+
+  /* Primitives summary */
+  .primitives-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin: 28px 0;
+  }
+  .primitive-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 18px;
+    transition: all 0.2s;
+  }
+  .primitive-card:hover { border-color: rgba(0,212,255,0.3); }
+  .primitive-num { font-size: 10px; color: var(--text3); margin-bottom: 6px; font-weight: 600; letter-spacing: 1px; }
+  .primitive-name { font-family: var(--font-head); font-size: 14px; font-weight: 700; color: var(--cyan); margin-bottom: 6px; }
+  .primitive-desc { font-size: 11px; color: var(--text2); line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">
+    <div class="nav-logo-mark"><span>H</span> HyperVibe</div>
+    <div class="nav-version">v0.1 · Hyperliquid Perps</div>
+    <div class="nav-links-badge">
+      <a class="nav-badge" href="http://localhost:3001">App →</a>
+      <a class="nav-badge" href="https://github.com/hyperliquid-dex/hyperliquid-python-sdk" target="_blank">HL Docs</a>
+    </div>
+  </div>
+
+  <div class="nav-section-label">Getting Started</div>
+  <a class="nav-link active" href="#introduction"><span class="ico">◈</span>Introduction</a>
+  <a class="nav-link" href="#what-is-hypervibe"><span class="ico">◉</span>What is HyperVibe?</a>
+  <a class="nav-link" href="#the-harness"><span class="ico">◎</span>The Harness</a>
+  <a class="nav-link" href="#install"><span class="ico">⌨</span>Install & Run</a>
+
+  <div class="nav-section-label">Primitives</div>
+  <a class="nav-link" href="#market-tooling"><span class="ico">⬡</span>Market Tooling</a>
+  <a class="nav-link" href="#heartbeat"><span class="ico">♥</span>Heartbeat</a>
+  <a class="nav-link" href="#triggers"><span class="ico">◷</span>Triggers</a>
+  <a class="nav-link" href="#permissions"><span class="ico">◎</span>Permissions</a>
+  <a class="nav-link" href="#playbooks"><span class="ico">◈</span>Playbooks</a>
+  <a class="nav-link" href="#learnings"><span class="ico">◉</span>Learnings</a>
+
+  <div class="nav-section-label">Reference</div>
+  <a class="nav-link" href="#primitives-glance"><span class="ico">≡</span>Primitives at a Glance</a>
+  <a class="nav-link" href="#data-flow"><span class="ico">→</span>Full Data Flow</a>
+
+  <a class="nav-run-btn" href="http://localhost:3001">Open App ↗</a>
+</nav>
+
+<main>
+
+  <!-- Hero -->
+  <section class="hero" id="introduction">
+    <div class="hero-tag">v0.1 · Hyperliquid Perpetuals</div>
+    <h1>The agentic harness for <em>autonomous trading</em></h1>
+    <p class="hero-sub">
+      Six primitives that give Claude everything it needs to trade Hyperliquid perps on your behalf — and nothing more than you've authorised.
+    </p>
+    <div class="hero-chips">
+      <div class="chip"><span class="dot"></span>24/7 — Hyperliquid never closes</div>
+      <div class="chip"><span class="dot" style="background:var(--cyan)"></span>100+ perp markets</div>
+      <div class="chip"><span class="dot" style="background:var(--yellow)"></span>USDC-settled, on-chain signing</div>
+    </div>
+    <div class="terminal">
+      <div><span class="prompt">$</span> npm install && npm start</div>
+      <div style="margin-top:8px"><span class="ok">✓</span> HyperVibe running at <span style="color:var(--cyan)">http://localhost:3001</span></div>
+      <div style="margin-top:4px;color:var(--text3)">  Click <span style="color:var(--cyan2)">http://localhost:3001</span> if it doesn't open automatically</div>
+    </div>
+  </section>
+
+  <!-- What is HyperVibe -->
+  <section class="doc-section" id="what-is-hypervibe">
+    <div class="section-num">01 introduction</div>
+    <h2>What is HyperVibe?</h2>
+    <p>HyperVibe is the backend for agentic perpetuals trading. Just as infrastructure platforms give developers a database, auth, and storage without making them build those systems from scratch, HyperVibe gives an AI trading agent a live Hyperliquid connection, a scheduling system, a strategy memory, an audit trail, a monitoring loop, and a permission gate — without you having to build any of it.</p>
+    <p>You describe what you want to trade and why. The agent figures out how. The harness makes sure it runs reliably, accountably, and only as far as you've permitted.</p>
+
+    <div class="features">
+      <div class="feature-card">
+        <div class="feature-icon">🔌</div>
+        <div class="feature-title">Live Hyperliquid awareness</div>
+        <div class="feature-desc">20 built-in tools covering execution, real-time prices, candles, indicators, funding rates, orderbook depth, vault data, and account state. The agent never reasons from stale training data.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🧠</div>
+        <div class="feature-title">Strategy memory that persists</div>
+        <div class="feature-desc">The agent doesn't start from zero each session. A written Playbook anchors every decision — consistent rules, consistent judgement, isolated P&L tracking.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⏱️</div>
+        <div class="feature-title">Runs on its own schedule</div>
+        <div class="feature-desc">Set a trigger once. The agent wakes itself up, reasons from live data, and acts — without you being present. Hyperliquid trades 24/7; HyperVibe monitors 24/7.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔒</div>
+        <div class="feature-title">No trade without your consent</div>
+        <div class="feature-desc">A code-level approval gate sits in front of every execution. Every trade recommendation arrives as a structured card with full reasoning. One click to approve or reject.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- The Harness -->
+  <section class="doc-section" id="the-harness">
+    <div class="section-num">02 architecture</div>
+    <h2>The Harness</h2>
+    <p>The word "harness" is deliberate. A harness doesn't replace the horse — it channels its capability into something controllable, directed, and safe. HyperVibe does the same for Claude.</p>
+    <p>An LLM on its own is powerful but directionless for trading. It has no state, no time, no Hyperliquid connection, no memory of what it did yesterday, and no guardrails on what it can do next. The harness provides all of that as a set of interlocking primitives.</p>
+
+    <div class="primitives-grid">
+      <div class="primitive-card">
+        <div class="primitive-num">01 primitive</div>
+        <div class="primitive-name">Market Tooling</div>
+        <div class="primitive-desc">20 tools. Prices, candles, indicators, funding rates, orderbook, account state, vaults. The agent never guesses.</div>
+      </div>
+      <div class="primitive-card">
+        <div class="primitive-num">02 primitive</div>
+        <div class="primitive-name">Heartbeat</div>
+        <div class="primitive-desc">30s monitoring loop. Evaluates triggers cheaply. Only spins up the main agent when something fires.</div>
+      </div>
+      <div class="primitive-card">
+        <div class="primitive-num">03 primitive</div>
+        <div class="primitive-name">Triggers</div>
+        <div class="primitive-desc">Condition + action pairs. Code, time, or LLM conditions. hard_order or reasoning_job actions.</div>
+      </div>
+      <div class="primitive-card">
+        <div class="primitive-num">04 primitive</div>
+        <div class="primitive-name">Permissions</div>
+        <div class="primitive-desc">Code-level approval gate. Three consent modes. Every decision recorded with reasoning.</div>
+      </div>
+      <div class="primitive-card">
+        <div class="primitive-num">05 primitive</div>
+        <div class="primitive-name">Playbooks</div>
+        <div class="primitive-desc">Persistent strategy document. Loaded into agent context on every run. Consistent identity across sessions.</div>
+      </div>
+      <div class="primitive-card">
+        <div class="primitive-num">06 primitive</div>
+        <div class="primitive-name">Learnings</div>
+        <div class="primitive-desc">Immutable trade journal. Every fill logged with reasoning. Observations compound into edge over time.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Install -->
+  <section class="doc-section" id="install">
+    <div class="section-num">03 setup</div>
+    <h2>Install & Run</h2>
+
+    <table>
+      <tr><th>Dependency</th><th>Notes</th></tr>
+      <tr><td>Node.js ≥ 20</td><td>The app runs as a local Node process</td></tr>
+      <tr><td>Anthropic API key</td><td>Claude Sonnet for reasoning, Haiku for trigger evaluation</td></tr>
+      <tr><td>Hyperliquid wallet</td><td>Private key + address. Stored only in <code>~/.hypervibe/</code>, never leaves your machine</td></tr>
+    </table>
+
+    <pre><code><span class="cmt"># Clone and install</span>
+git clone https://github.com/you/hypervibe
+cd hypervibe && npm install
+
+<span class="cmt"># Configure</span>
+cp .env.example .env
+<span class="cmt"># → Edit .env with your ANTHROPIC_API_KEY and HL credentials</span>
+
+<span class="cmt"># Run</span>
+npm start</code></pre>
+
+    <div class="callout">
+      <span class="callout-icon">✦</span>
+      <span><strong>Start with chat before automation.</strong> Ask the agent to fetch your positions, check a price, run a technical analysis. Once you understand how it reasons, give it a Playbook and let it run autonomously.</span>
+    </div>
+
+    <h3>Environment variables</h3>
+    <table>
+      <tr><th>Variable</th><th>Required</th><th>Description</th></tr>
+      <tr><td>ANTHROPIC_API_KEY</td><td><span class="badge badge-red">required</span></td><td>Your Anthropic API key</td></tr>
+      <tr><td>HL_WALLET_ADDRESS</td><td><span class="badge badge-red">required</span></td><td>Your Hyperliquid wallet address (0x…)</td></tr>
+      <tr><td>HL_PRIVATE_KEY</td><td><span class="badge badge-yellow">for trading</span></td><td>Your wallet private key. Without it, read-only mode.</td></tr>
+      <tr><td>HL_NETWORK</td><td><span class="badge badge-cyan">optional</span></td><td><code>mainnet</code> (default) or <code>testnet</code></td></tr>
+      <tr><td>HL_VAULT_ADDRESS</td><td><span class="badge badge-cyan">optional</span></td><td>Trade via a vault address instead of your wallet</td></tr>
+      <tr><td>PORT</td><td><span class="badge badge-cyan">optional</span></td><td>HTTP port (default: 3001)</td></tr>
+    </table>
+  </section>
+
+  <!-- Market Tooling -->
+  <section class="doc-section" id="market-tooling">
+    <div class="section-num">01 primitive</div>
+    <h2>Market Tooling</h2>
+    <p>The bridge between Claude and Hyperliquid — the agent never reasons from stale training data. 20 built-in tools covering execution, live prices, candles, indicators, funding rates, order book depth, vault data, and full account state.</p>
+
+    <h3>Execution tools</h3>
+    <table>
+      <tr><th>Tool</th><th>What it does</th><th>Approval</th></tr>
+      <tr><td>place_order</td><td>Queue a market or limit order for user approval</td><td><span class="badge badge-red">Yes</span></td></tr>
+      <tr><td>cancel_order</td><td>Queue cancellation of a pending order</td><td><span class="badge badge-red">Yes</span></td></tr>
+      <tr><td>set_leverage</td><td>Queue a leverage change for a coin</td><td><span class="badge badge-red">Yes</span></td></tr>
+    </table>
+
+    <h3>Account tools</h3>
+    <table>
+      <tr><th>Tool</th><th>What it does</th><th>Approval</th></tr>
+      <tr><td>get_positions</td><td>Open perp positions with unrealized PnL, entry price, mark price, leverage, liquidation price</td><td class="no-approval">No</td></tr>
+      <tr><td>get_account_value</td><td>Total equity, margin used, withdrawable balance</td><td class="no-approval">No</td></tr>
+      <tr><td>get_open_orders</td><td>Pending limit orders</td><td class="no-approval">No</td></tr>
+      <tr><td>get_fills</td><td>Recent trade history with fees and closed PnL</td><td class="no-approval">No</td></tr>
+      <tr><td>get_funding_payments</td><td>Historical funding payments received / paid</td><td class="no-approval">No</td></tr>
+    </table>
+
+    <h3>Market data tools</h3>
+    <table>
+      <tr><th>Tool</th><th>What it does</th></tr>
+      <tr><td>get_price</td><td>Live mid price for one or more coins</td></tr>
+      <tr><td>get_all_mids</td><td>All perpetual mid prices in one call</td></tr>
+      <tr><td>get_candles</td><td>OHLCV data across 1m / 5m / 15m / 30m / 1h / 4h / 1d</td></tr>
+      <tr><td>compute_indicators</td><td>RSI, MACD, EMA, SMA, Bollinger Bands, ATR — computed from live OHLCV</td></tr>
+      <tr><td>get_funding_rate</td><td>Current and predicted funding rate, open interest, mark vs oracle price</td></tr>
+      <tr><td>get_orderbook</td><td>L2 bid/ask depth with quantities</td></tr>
+      <tr><td>get_market_info</td><td>Max leverage, size decimals, 24h volume, open interest</td></tr>
+      <tr><td>get_top_movers</td><td>Biggest 24h gainers and losers across all perps</td></tr>
+      <tr><td>search_coins</td><td>Find perpetual markets by name or symbol</td></tr>
+      <tr><td>get_vault_details</td><td>Vault TVL, leader address, follower count, portfolio history</td></tr>
+    </table>
+
+    <h3>Signing</h3>
+    <p>HyperVibe implements Hyperliquid's L1 action signing natively using <code>ethers</code> v6 and <code>msgpackr</code>. Actions are hashed via <code>keccak256(msgpack(action) | uint64BE(nonce) | vaultAddress)</code> and signed as EIP-712 <code>Agent</code> type against Hyperliquid's L1 domain (chainId 1337).</p>
+    <p>Your private key never leaves your machine. The signing happens locally before the signed payload is sent to Hyperliquid's exchange endpoint.</p>
+  </section>
+
+  <!-- Heartbeat -->
+  <section class="doc-section" id="heartbeat">
+    <div class="section-num">02 primitive</div>
+    <h2>Heartbeat</h2>
+    <p>Continuous market monitoring without continuous LLM inference. A lightweight loop that wakes the agent only when something matters.</p>
+    <p>Hyperliquid trades 24/7. Heartbeat monitors 24/7. But it does so cheaply — Claude Sonnet only runs when a trigger condition actually fires. Everything else is evaluated in pure JavaScript or via Claude Haiku (yes/no only).</p>
+
+    <div class="flow">
+      <div class="flow-step">
+        <div class="flow-num">01</div>
+        <div class="flow-body">
+          <div class="flow-title"><span class="badge badge-cyan">Tick</span> Interval fires</div>
+          <div class="flow-desc">Every 30 seconds. Hyperliquid is 24/7 so Heartbeat never slows down.</div>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">02</div>
+        <div class="flow-body">
+          <div class="flow-title"><span class="badge badge-cyan">Snapshot</span> Prices fetched</div>
+          <div class="flow-desc">Mid prices fetched only for coins referenced in active triggers. Not the whole market — just what's being watched.</div>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">03</div>
+        <div class="flow-body">
+          <div class="flow-title"><span class="badge badge-yellow">Evaluate</span> Triggers checked</div>
+          <div class="flow-desc">Code triggers evaluated in pure JS (zero cost). LLM triggers sent to Claude Haiku for a yes/no answer (minimal cost). Cron triggers fire on their schedule.</div>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">04</div>
+        <div class="flow-body">
+          <div class="flow-title"><span class="badge badge-green">Fire or stand down</span></div>
+          <div class="flow-desc">If a condition fires: execute hard_order immediately, or wake Claude Sonnet with a reasoning_job. If nothing fires: quiet tick, no LLM cost.</div>
+        </div>
+      </div>
+    </div>
+
+    <table>
+      <tr><th>Condition mode</th><th>Evaluated by</th><th>Cost per tick</th><th>Example</th></tr>
+      <tr><td>code</td><td>Pure JavaScript</td><td><span class="badge badge-green">~$0</span></td><td><code>prices["BTC"] &lt;= 90000</code></td></tr>
+      <tr><td>time</td><td>node-cron scheduler</td><td><span class="badge badge-green">~$0</span></td><td><code>0 9 * * 1-5</code></td></tr>
+      <tr><td>llm</td><td>Claude Haiku (yes/no only)</td><td><span class="badge badge-cyan">minimal</span></td><td>"Is BTC showing unusual volatility?"</td></tr>
+    </table>
+  </section>
+
+  <!-- Triggers -->
+  <section class="doc-section" id="triggers">
+    <div class="section-num">03 primitive</div>
+    <h2>Triggers</h2>
+    <p>The automation primitive — every autonomous action originates from a trigger. A trigger is a condition and an action. When the condition becomes true, the action fires.</p>
+
+    <h3>Condition modes</h3>
+    <table>
+      <tr><th>Mode</th><th>When it fires</th><th>Typical use</th></tr>
+      <tr><td><span class="badge badge-purple">code</span></td><td>When a JavaScript expression evaluates to true against the live price snapshot</td><td>Stop-loss, take-profit, drawdown guard</td></tr>
+      <tr><td><span class="badge badge-cyan">time</span></td><td>On a cron schedule</td><td>Morning scans, position reviews, EOD closes</td></tr>
+      <tr><td><span class="badge badge-green">llm</span></td><td>When Haiku answers "yes" to a natural language question</td><td>Instinct-based conditions — sentiment, unusual movement</td></tr>
+    </table>
+
+    <h3>Action types</h3>
+    <table>
+      <tr><th>Type</th><th>What happens</th><th>Agent involved?</th><th>Typical use</th></tr>
+      <tr>
+        <td><span class="badge badge-red">hard_order</span></td>
+        <td>Trade executes immediately — no reasoning, no approval queue. Pre-authorised at trigger creation.</td>
+        <td>No</td>
+        <td>Stop-losses, take-profits, emergency closes</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-yellow">reasoning_job</span></td>
+        <td>Claude Sonnet wakes with trigger context and Playbook loaded, analyses the situation, and may queue approvals.</td>
+        <td>Yes</td>
+        <td>Morning scans, position reviews, event-driven analysis</td>
+      </tr>
+    </table>
+
+    <h3>Example trigger stack — HYPE Momentum</h3>
+    <table>
+      <tr><th>Trigger</th><th>Condition</th><th>Action</th></tr>
+      <tr><td>HYPE Stop Loss</td><td><code>code</code> — <code>prices["HYPE"] &lt;= 24.50</code></td><td>hard_order SELL MARKET (close long)</td></tr>
+      <tr><td>HYPE Take Profit</td><td><code>code</code> — <code>prices["HYPE"] >= 32.00</code></td><td>hard_order SELL MARKET (close long)</td></tr>
+      <tr><td>Portfolio Monitor</td><td><code>time</code> — <code>0 * * * *</code> (hourly)</td><td>reasoning_job — review positions, check funding</td></tr>
+      <tr><td>High Funding Alert</td><td><code>llm</code> — "Is HYPE funding rate above 0.1% per hour?"</td><td>reasoning_job — evaluate whether to close long</td></tr>
+      <tr><td>Morning Scan</td><td><code>time</code> — <code>0 8 * * *</code></td><td>reasoning_job — find best setups for the day</td></tr>
+    </table>
+
+    <div class="callout">
+      <span class="callout-icon">◈</span>
+      <span><strong>hard_order vs reasoning_job:</strong> For stop-losses, always use hard_order. A stop-loss that waits for Claude to wake up, analyse, and queue an approval is not a stop-loss — it's a wish. The consent for a hard_order is given when you create the trigger.</span>
+    </div>
+  </section>
+
+  <!-- Permissions -->
+  <section class="doc-section" id="permissions">
+    <div class="section-num">04 primitive</div>
+    <h2>Permissions</h2>
+    <p>The trust primitive. A code-level approval gate that ensures no money moves without recorded consent.</p>
+
+    <h3>Three levels of consent</h3>
+    <table>
+      <tr><th>Mode</th><th>When given</th><th>Where recorded</th></tr>
+      <tr><td>Trade-level</td><td>At execution time — you approve each trade from the UI</td><td>Approval record in SQLite — Approve / Reject</td></tr>
+      <tr><td>Trigger-level (pre-auth)</td><td>When you create a hard_order trigger — you specify the exact condition and trade upfront</td><td>Trigger record — condition + tradeArgs</td></tr>
+      <tr><td>Autonomous (Playbook)</td><td>When you define Playbook guardrails — max capital, max loss, circuit breakers</td><td>Playbook document — mandate boundaries</td></tr>
+    </table>
+
+    <p>Every approval card shows the exact trade parameters plus the full reasoning the agent used to reach its recommendation. This is not a chat reply — it's a structured, timestamped record.</p>
+  </section>
+
+  <!-- Playbooks -->
+  <section class="doc-section" id="playbooks">
+    <div class="section-num">05 primitive</div>
+    <h2>Playbooks</h2>
+    <p>The agent's operating manual. A written strategy document that anchors every decision made on its behalf.</p>
+    <p>Every new LLM session starts from zero. Without a Playbook, ask the agent whether to buy HYPE today, close the tab, ask again tomorrow — and you might get a different answer. A Playbook fixes this. It is loaded as context on every run — whether triggered by a schedule, a price condition, or a live chat.</p>
+
+    <h3>What a Playbook contains</h3>
+    <table>
+      <tr><th>Section</th><th>What it captures</th><th>Example</th></tr>
+      <tr><td>Investment thesis</td><td>Why you're trading this and what you believe</td><td>"HYPE is undervalued relative to its market share. Long bias, target 3–5% moves."</td></tr>
+      <tr><td>Rules and constraints</td><td>What the agent must and must not do</td><td>"Max 3x leverage. Never risk more than 1% equity per trade. Close all if daily drawdown > 3%."</td></tr>
+      <tr><td>Entry and exit approach</td><td>How the agent identifies and sizes trades</td><td>"LONG: RSI &lt; 40 on 4h, price above EMA21. Size = 1% equity / (entry - SL)."</td></tr>
+      <tr><td>Capital allocation</td><td>How much USDC is deployed and split</td><td>"Slot A: $2,000 · Slot B: $2,000 · Reserve: $500 (never deployed)"</td></tr>
+    </table>
+
+    <div class="callout">
+      <span class="callout-icon">✦</span>
+      <span>You don't write Playbooks from scratch. Describe your strategy in chat — the agent shapes it into a structured document, then you approve it and it becomes the operating manual.</span>
+    </div>
+  </section>
+
+  <!-- Learnings -->
+  <section class="doc-section" id="learnings">
+    <div class="section-num">06 primitive</div>
+    <h2>Learnings</h2>
+    <p>The agent's audit trail and compounding memory. An immutable record of every trade, every decision, and everything distilled from both.</p>
+    <p>Every fill is logged with: coin, side, size, executed price, fee, closed PnL, and the reasoning the agent wrote at the moment of entry. You can always audit exactly why it made any decision.</p>
+    <p>Beyond accountability — without a record of what worked and what didn't, the agent makes the same mistakes indefinitely. Observations distilled from the journal feed forward into Playbook refinements over time.</p>
+  </section>
+
+  <!-- Primitives at a Glance -->
+  <section class="doc-section" id="primitives-glance">
+    <div class="section-num">reference</div>
+    <h2>Primitives at a Glance</h2>
+    <table>
+      <tr><th>#</th><th>Primitive</th><th>What it gives the agent</th><th>Without it</th></tr>
+      <tr><td>01</td><td><strong>Market Tooling</strong></td><td>Live Hyperliquid data and on-chain execution — 20 tools, never stale</td><td>Agent reasons blind; can't trade</td></tr>
+      <tr><td>02</td><td><strong>Heartbeat</strong></td><td>Always-on monitoring that wakes the agent only when a condition fires</td><td>Runs 24/7 at full cost, or misses triggers</td></tr>
+      <tr><td>03</td><td><strong>Triggers</strong></td><td>Condition + action pairs that drive all automation</td><td>Agent runs once and is forgotten</td></tr>
+      <tr><td>04</td><td><strong>Permissions</strong></td><td>Code-level approval gate with three consent modes and full audit trail</td><td>Agent acts without authorisation</td></tr>
+      <tr><td>05</td><td><strong>Playbooks</strong></td><td>Persistent strategy document in context on every agent run</td><td>Every session starts from zero</td></tr>
+      <tr><td>06</td><td><strong>Learnings</strong></td><td>Immutable journal; every fill logged with reasoning</td><td>Same mistakes indefinitely; no accountability</td></tr>
+    </table>
+  </section>
+
+  <!-- Full Data Flow -->
+  <section class="doc-section" id="data-flow">
+    <div class="section-num">reference</div>
+    <h2>Full Data Flow</h2>
+    <p>How a complete autonomous Playbook run flows through all six primitives — from Heartbeat tick to executed trade.</p>
+
+    <div class="flow">
+      <div class="flow-step">
+        <div class="flow-num">01</div>
+        <div class="flow-body">
+          <div class="flow-title">Heartbeat <span class="badge badge-cyan">deterministic</span></div>
+          <div class="flow-desc">Tick fires. Mid prices fetched for all watched coins. Trigger condition evaluated — e.g. hourly cron <code>0 * * * *</code>.</div>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">02</div>
+        <div class="flow-body">
+          <div class="flow-title">Trigger <span class="badge badge-yellow">fires</span></div>
+          <div class="flow-desc">Condition met. Trigger record updated. Agent instance started with trigger context and Playbook ID.</div>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">03</div>
+        <div class="flow-body">
+          <div class="flow-title">Playbook <span class="badge badge-green">loaded</span></div>
+          <div class="flow-desc">Agent receives the full Playbook document and recent Learnings as context. It knows its mandate, rules, and capital allocation.</div>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">04</div>
+        <div class="flow-body">
+          <div class="flow-title">Market Tooling <span class="badge badge-cyan">tool calls</span></div>
+          <div class="flow-desc">Agent calls <code>get_positions</code>, <code>get_price</code>, <code>compute_indicators</code>, <code>get_funding_rate</code>. Synthesises a decision — trade or stand down — with full reasoning.</div>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">05</div>
+        <div class="flow-body">
+          <div class="flow-title">Permissions <span class="badge badge-red">gate</span></div>
+          <div class="flow-desc">Signals fire. Agent calls <code>place_order</code> with full reasoning. Trade queued in the approval gate. Approval card appears in your UI (or pushes to Telegram — coming soon).</div>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">06</div>
+        <div class="flow-body">
+          <div class="flow-title">Broker <span class="badge badge-green">executed</span></div>
+          <div class="flow-desc">You approve. EIP-712 signature computed locally. Order sent to <code>api.hyperliquid.xyz/exchange</code>. Fill confirmed.</div>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">07</div>
+        <div class="flow-body">
+          <div class="flow-title">Learnings <span class="badge badge-cyan">logged</span></div>
+          <div class="flow-desc">Fill written to the trade journal with coin, size, executed price, fee, closed PnL, and the reasoning from step 04. Tagged to the active Playbook.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+// Highlight active nav link on scroll
+const sections = document.querySelectorAll('[id]');
+const navLinks = document.querySelectorAll('.nav-link');
+
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      navLinks.forEach(l => l.classList.remove('active'));
+      const active = document.querySelector(`.nav-link[href="#${e.target.id}"]`);
+      if (active) active.classList.add('active');
+    }
+  });
+}, { rootMargin: '-30% 0px -60% 0px' });
+
+sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>
