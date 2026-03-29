@@ -441,22 +441,7 @@ export async function createApp(config) {
 
 
   // ── Skills ────────────────────────────────────────────────────────────────
-  app.get('/api/skills', (_req, res) => res.json(Skills.list()));
-  app.post('/api/skills', (req, res) => {
-    try { res.json(Skills.create(req.body)); } catch(e) { res.status(400).json({ error: e.message }); }
-  });
-  app.get('/api/skills/:id', (req, res) => {
-    const s = Skills.get(req.params.id);
-    if (!s) return res.status(404).json({ error: 'Not found' });
-    res.json(s);
-  });
-  app.patch('/api/skills/:id', (req, res) => {
-    try { res.json(Skills.update(req.params.id, req.body)); } catch(e) { res.status(400).json({ error: e.message }); }
-  });
-  app.delete('/api/skills/:id', (req, res) => {
-    Skills.delete(req.params.id);
-    res.json({ ok: true });
-  });
+  app.get('/api/skills', async (_req, res) => res.json(await Skills.list()));
 
   app.get('/api/skills/registry', async (req, res) => {
     const registryUrl = req.query.url ||
@@ -466,7 +451,7 @@ export async function createApp(config) {
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const data = await r.json();
       // Annotate with installed status
-      const installed = Skills.list().map(s => s.name);
+      const installed = (await Skills.list()).map(s => s.name);
       data.skills = (data.skills ?? []).map(s => ({
         ...s,
         installed: installed.includes(s.name),
@@ -487,7 +472,7 @@ export async function createApp(config) {
       if (!content.trim()) throw new Error('Empty skill file');
       // Extract name from frontmatter if not provided
       const fmName = content.match(/^---[\s\S]*?\nname:\s*(.+)\n/)?.[1]?.trim();
-      const skill = Skills.create({
+      const skill = await Skills.create({
         name:        name || fmName || url.split('/').pop().replace('.md', ''),
         description: description || content.match(/\ndescription:\s*(.+)\n/)?.[1]?.trim() || '',
         tags:        tags || [],
@@ -506,7 +491,7 @@ export async function createApp(config) {
     if (!content) return res.status(400).json({ error: 'content is required' });
     try {
       const fmName = content.match(/^---[\s\S]*?\nname:\s*(.+)\n/)?.[1]?.trim();
-      const skill = Skills.create({
+      const skill = await Skills.create({
         name:        name || fmName || 'custom-skill',
         description: description || content.match(/\ndescription:\s*(.+)\n/)?.[1]?.trim() || '',
         tags:        tags || [],
@@ -519,11 +504,28 @@ export async function createApp(config) {
     }
   });
 
-  app.post('/api/skills/:id/attach', (req, res) => {
-    res.json(Skills.attachToPlaybook(req.params.id, req.body.playbookId));
+  app.post('/api/skills', async (req, res) => {
+    try { res.json(await Skills.create(req.body)); } catch(e) { res.status(400).json({ error: e.message }); }
   });
-  app.post('/api/skills/:id/detach', (req, res) => {
-    res.json(Skills.detachFromPlaybook(req.params.id, req.body.playbookId));
+  app.get('/api/skills/:id', async (req, res) => {
+    const s = await Skills.get(req.params.id);
+    if (!s) return res.status(404).json({ error: 'Not found' });
+    res.json(s);
+  });
+  app.patch('/api/skills/:id', async (req, res) => {
+    try { res.json(await Skills.update(req.params.id, req.body)); } catch(e) { res.status(400).json({ error: e.message }); }
+  });
+  app.delete('/api/skills/:id', async (req, res) => {
+    await Skills.delete(req.params.id);
+    res.json({ ok: true });
+  });
+
+
+  app.post('/api/skills/:id/attach', async (req, res) => {
+    res.json(await Skills.attachToPlaybook(req.params.id, req.body.playbookId));
+  });
+  app.post('/api/skills/:id/detach', async (req, res) => {
+    res.json(await Skills.detachFromPlaybook(req.params.id, req.body.playbookId));
   });
 
   // ── Telegram ──────────────────────────────────────────────────────────────
