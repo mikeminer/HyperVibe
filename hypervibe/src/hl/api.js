@@ -1,6 +1,7 @@
 /**
  * Hyperliquid API client
  * Covers all info (read) and exchange (write) endpoints.
+ * Supports Unified Account (spot + perps combined).
  */
 
 const BASE_URL = {
@@ -11,10 +12,10 @@ const BASE_URL = {
 export class HyperliquidAPI {
   constructor(network = 'mainnet') {
     this.base = BASE_URL[network] ?? BASE_URL.mainnet;
-    this._meta = null;        // cached perp metadata
-    this._spotMeta = null;    // cached spot metadata
+    this._meta = null;
+    this._spotMeta = null;
     this._metaTs = 0;
-    this.CACHE_TTL = 60_000;  // 1 min cache for meta
+    this.CACHE_TTL = 60_000;
   }
 
   async _info(body) {
@@ -185,7 +186,10 @@ export class HyperliquidAPI {
       c.change24h = c.prevDayPx > 0 ? ((c.price - c.prevDayPx) / c.prevDayPx) * 100 : 0;
     }
     const sorted = [...coins].sort((a, b) => Math.abs(b.change24h) - Math.abs(a.change24h));
-    return { gainers: sorted.filter(c => c.change24h > 0).slice(0, n), losers: sorted.filter(c => c.change24h < 0).slice(0, n) };
+    return {
+      gainers: sorted.filter(c => c.change24h > 0).slice(0, n),
+      losers: sorted.filter(c => c.change24h < 0).slice(0, n),
+    };
   }
 
   async searchCoins(query) {
@@ -197,10 +201,14 @@ export class HyperliquidAPI {
       .map(u => ({ coin: u.name, maxLeverage: u.maxLeverage, szDecimals: u.szDecimals }));
   }
 
-  // ── Account / User ────────────────────────────────────────────────────────
+  // ── Account / User (Unified Account support) ──────────────────────────────
 
   async getClearinghouseState(address) {
     return this._info({ type: 'clearinghouseState', user: address });
+  }
+
+  async getSpotClearinghouseState(address) {
+    return this._info({ type: 'spotClearinghouseState', user: address });
   }
 
   async getPositions(address) {
@@ -231,14 +239,41 @@ export class HyperliquidAPI {
     return positions;
   }
 
+  async getSpotBalances(address) {
+    const spotState = await this.getSpotClearinghouseState(address);
+    return (spotState.balances ?? [])
+      .filter(b => parseFloat(b.total) > 0)
+      .map(b => ({
+        coin: b.coin,
+        total: parseFloat(b.total),
+        hold: parseFloat(b.hold),
+      }));
+  }
+
   async getAccountValue(address) {
-    const state = await this.getClearinghouseState(address);
+    // Fetch perps AND spot in parallel — required for Unified Account
+    const [perpState, spotState] = await Promise.all([
+      this.getClearinghouseState(address),
+      this.getSpotClearinghouseState(address),
+    ]);
+
+    const perpEquity = parseFloat(perpState.marginSummary?.accountValue ?? 0);
+    const spotUsdc   = parseFloat(spotState.balances?.find(b => b.coin === 'USDC')?.total ?? 0);
+    const spotHype   = parseFloat(spotState.balances?.find(b => b.coin === 'HYPE')?.total ?? 0);
+
+    // Total = perp equity + spot USDC (unified account keeps USDC in spot)
+    const totalAccountValue = perpEquity + spotUsdc;
+
     return {
-      accountValue: parseFloat(state.marginSummary?.accountValue ?? 0),
-      totalMarginUsed: parseFloat(state.marginSummary?.totalMarginUsed ?? 0),
-      totalNtlPos: parseFloat(state.marginSummary?.totalNtlPos ?? 0),
-      withdrawable: parseFloat(state.withdrawable ?? 0),
-      crossMaintenanceMarginUsed: parseFloat(state.crossMaintenanceMarginUsed ?? 0),
+      accountValue: totalAccountValue,
+      perpEquity,
+      spotUsdc,
+      spotHype,
+      totalMarginUsed: parseFloat(perpState.marginSummary?.totalMarginUsed ?? 0),
+      totalNtlPos: parseFloat(perpState.marginSummary?.totalNtlPos ?? 0),
+      withdrawable: parseFloat(perpState.withdrawable ?? 0),
+      crossMaintenanceMarginUsed: parseFloat(perpState.crossMaintenanceMarginUsed ?? 0),
+      isUnifiedAccount: spotUsdc > 0 && perpEquity === 0,
     };
   }
 
@@ -298,11 +333,7 @@ export class HyperliquidAPI {
   // ── Exchange actions (need signing) ───────────────────────────────────────
 
   async submitAction(action, nonce, signature, vaultAddress = null) {
-    const payload = {
-      action,
-      nonce,
-      signature,
-    };
+    const payload = { action, nonce, signature };
     if (vaultAddress) payload.vaultAddress = vaultAddress;
     return this._exchange(payload);
   }

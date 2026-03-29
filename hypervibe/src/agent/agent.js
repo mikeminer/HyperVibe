@@ -8,6 +8,7 @@ import { TOOL_DEFINITIONS, handleTool } from './tools.js';
 import { Playbooks } from '../primitives/playbooks.js';
 import { Learnings } from '../primitives/learnings.js';
 import { Triggers } from '../primitives/triggers.js';
+import { Skills } from '../primitives/skills.js';
 import { Permissions } from '../primitives/permissions.js';
 
 const MODEL = 'claude-sonnet-4-20250514';
@@ -43,7 +44,14 @@ You have 20 tools covering market data, account info, and trade execution. Every
 - get_candles + compute_indicators: use for technical analysis before any entry.
 - get_funding_rate: always check before entering a position that might be held overnight.
 - place_order: always include full reasoning. The user reads this verbatim in the approval card.
-- create_trigger: create stop-loss and target triggers immediately after every entry.
+- place_exit_orders: **ALWAYS call this immediately after a position is opened.** This places real native stop-loss and take-profit orders on Hyperliquid that appear in the exchange UI and survive HyperVibe restarts. Do NOT rely only on create_trigger for exit management — those are software-only.
+- create_trigger: use for monitoring and reasoning jobs (hourly reviews, funding alerts). NOT a replacement for native exit orders.
+
+## Exit order workflow (MANDATORY after every entry)
+1. place_order → user approves → position opens
+2. IMMEDIATELY call place_exit_orders with SL + TP1 + optional TP2/TP3
+3. Optionally create a time-based reasoning_job trigger for trailing stop management
+Never skip step 2. Native orders on Hyperliquid protect the position even when HyperVibe is offline.
 `;
 
 const client = new Anthropic();
@@ -65,6 +73,14 @@ export async function runAgent(messages, context, onChunk = null) {
   if (playbookId) {
     system += '\n' + Playbooks.toContext(playbookId) + '\n';
     system += '\n' + Learnings.toContext(playbookId) + '\n';
+  }
+
+  if (playbookId) {
+    const skillsCtx = Skills.toContext(playbookId);
+    if (skillsCtx) system += '\n' + skillsCtx + '\n';
+  } else {
+    const skillsCtx = Skills.toContext();
+    if (skillsCtx) system += '\n' + skillsCtx + '\n';
   }
 
   if (context.triggerContext) {

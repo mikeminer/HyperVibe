@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HyperVibe — Hyperliquid Autonomous Trading</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -630,6 +631,136 @@
   .sidebar-scroll { flex: 1; overflow-y: auto; }
   .sidebar-scroll::-webkit-scrollbar { width: 3px; }
   .sidebar-scroll::-webkit-scrollbar-thumb { background: var(--border2); }
+
+
+  /* ── Skill Store ─────────────────────────────────────────────────────────── */
+  .registry-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .registry-card:hover { border-color: var(--border2); }
+  .registry-card-info { flex: 1; min-width: 0; }
+  .registry-card-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 3px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .registry-card-desc { font-size: 11px; color: var(--text2); line-height: 1.4; margin-bottom: 5px; }
+  .registry-card-meta { font-size: 10px; color: var(--text3); display: flex; gap: 6px; flex-wrap: wrap; }
+  .registry-install-btn {
+    padding: 5px 12px;
+    border-radius: 5px;
+    border: 1px solid rgba(0,212,255,0.3);
+    background: var(--cyan-dim);
+    color: var(--cyan);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: all 0.15s;
+  }
+  .registry-install-btn:hover { background: rgba(0,212,255,0.2); border-color: var(--cyan); }
+  .registry-install-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .registry-install-btn.installed {
+    border-color: rgba(0,255,136,0.3);
+    background: var(--green-dim);
+    color: var(--green);
+    cursor: default;
+  }
+  .skill-tag {
+    background: var(--bg4, #1a1a28);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: 9px;
+    color: var(--text3);
+  }
+
+  /* ── Settings panel ──────────────────────────────────────────────────────── */
+  .settings-row { margin-bottom: 4px; }
+  .settings-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text2);
+    margin-bottom: 6px;
+  }
+  .settings-input {
+    width: 100%;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .settings-input:focus { border-color: var(--cyan); }
+  .settings-hint {
+    font-size: 11px;
+    color: var(--text3);
+    margin-top: 5px;
+    line-height: 1.5;
+  }
+  .settings-show-btn {
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    color: var(--text2);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 0 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: all 0.15s;
+  }
+  .settings-show-btn:hover { color: var(--text); border-color: var(--cyan); }
+  .settings-badge {
+    display: inline-block;
+    font-size: 9px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-left: 6px;
+    vertical-align: middle;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+  .badge-ok { background: var(--green-dim); color: var(--green); }
+  .badge-missing { background: var(--red-dim); color: var(--red); }
+  .net-btn {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 18px;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    color: var(--text2);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .net-btn.active { border-color: var(--cyan); color: var(--cyan); background: var(--cyan-dim); }
+  .net-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
 </style>
 </head>
 <body>
@@ -645,6 +776,7 @@
     <button class="nav-tab active" onclick="switchView('chat')">Chat</button>
     <button class="nav-tab" onclick="switchView('market')">Market</button>
     <button class="nav-tab" onclick="switchView('journal')">Journal</button>
+    <button class="nav-tab" id="settings-tab" onclick="switchView('settings')">⚙ Settings</button>
   </div>
 
   <div class="status-bar">
@@ -665,6 +797,15 @@
     </div>
     <div id="playbooks-list">
       <div class="empty-state"><div class="empty-text">No playbooks yet.<br>Ask the agent to create one.</div></div>
+    </div>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-label">
+      Skills
+      <button class="mini-btn" onclick="openCreateSkill()" title="New skill">+</button>
+    </div>
+    <div id="skills-list">
+      <div class="empty-state"><div class="empty-text">No skills yet.</div></div>
     </div>
   </div>
   <div class="sidebar-section sidebar-scroll">
@@ -728,6 +869,231 @@
   </div>
 </aside>
 
+
+<!-- Settings overlay panel -->
+<div id="settings-view" style="display:none;grid-column:2;grid-row:2;background:var(--bg);overflow-y:auto;padding:40px 60px;">
+  <div style="max-width:560px;">
+    <div style="font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--text);margin-bottom:6px;">Settings</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:32px;">Changes apply immediately — no restart needed. Saved to your .env file.</div>
+
+    <!-- Skill Store -->
+    <div style="margin-bottom:28px;">
+      <div style="font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-bottom:4px;">
+        Skill Store
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:14px;">Download and install skills from the HyperVibe registry or any URL.</div>
+
+      <!-- Registry URL -->
+      <div class="settings-row" style="margin-bottom:12px;">
+        <label class="settings-label">Registry URL</label>
+        <div style="display:flex;gap:8px;">
+          <input class="settings-input" id="registry-url" type="text"
+            value="https://raw.githubusercontent.com/mikeminer/HyperVibe/main/skills-registry.json"
+            style="font-size:11px;">
+          <button class="settings-show-btn" onclick="loadRegistry()" style="white-space:nowrap;min-width:60px;">Fetch</button>
+        </div>
+      </div>
+
+      <!-- Registry results -->
+      <div id="registry-results" style="margin-bottom:16px;">
+        <div style="font-size:11px;color:var(--text3);text-align:center;padding:16px;">Click Fetch to browse available skills</div>
+      </div>
+
+      <!-- Install from URL -->
+      <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px;">
+        <div style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text3);margin-bottom:8px;">Install from URL</div>
+        <div style="display:flex;gap:8px;">
+          <input class="settings-input" id="install-url" type="text" placeholder="https://raw.githubusercontent.com/.../skill.md" style="font-size:11px;">
+          <button class="settings-show-btn" onclick="installFromUrl()" style="white-space:nowrap;min-width:60px;">Install</button>
+        </div>
+      </div>
+
+      <!-- Install from paste -->
+      <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:12px;">
+        <div style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text3);margin-bottom:8px;">Paste Skill Markdown</div>
+        <textarea class="settings-input" id="paste-skill" rows="4"
+          placeholder="---&#10;name: my-skill&#10;description: What this skill does&#10;---&#10;Skill content here..."
+          style="font-size:11px;resize:vertical;min-height:80px;"></textarea>
+        <button onclick="installFromPaste()" style="margin-top:6px;padding:6px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;color:var(--text2);font-family:var(--font-mono);font-size:11px;cursor:pointer;" onmouseover="this.style.borderColor='var(--cyan)';this.style.color='var(--cyan)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--text2)'">
+          Install Pasted Skill
+        </button>
+      </div>
+
+      <!-- Install status -->
+      <div id="install-status" style="display:none;margin-top:10px;padding:8px 12px;border-radius:5px;font-size:11px;"></div>
+    </div>
+
+    <!-- Playbook Store -->
+    <div style="margin-bottom:28px;">
+      <div style="font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-bottom:4px;">
+        Playbook Store
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:14px;">Download complete trading strategies with pre-built rules, sizing, and triggers.</div>
+
+      <!-- Registry URL -->
+      <div class="settings-row" style="margin-bottom:12px;">
+        <label class="settings-label">Registry URL</label>
+        <div style="display:flex;gap:8px;">
+          <input class="settings-input" id="pb-registry-url" type="text"
+            value="https://raw.githubusercontent.com/mikeminer/HyperVibe/main/playbooks-registry.json"
+            style="font-size:11px;">
+          <button class="settings-show-btn" onclick="loadPlaybookRegistry()" style="white-space:nowrap;min-width:60px;">Fetch</button>
+        </div>
+      </div>
+
+      <!-- Registry results -->
+      <div id="pb-registry-results" style="margin-bottom:16px;">
+        <div style="font-size:11px;color:var(--text3);text-align:center;padding:16px;">Click Fetch to browse available playbooks</div>
+      </div>
+
+      <!-- Install from URL -->
+      <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px;">
+        <div style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text3);margin-bottom:8px;">Install from URL</div>
+        <div style="display:flex;gap:8px;">
+          <input class="settings-input" id="pb-install-url" type="text" placeholder="https://raw.githubusercontent.com/.../playbook.md" style="font-size:11px;">
+          <button class="settings-show-btn" onclick="installPlaybookFromUrl()" style="white-space:nowrap;min-width:60px;">Install</button>
+        </div>
+      </div>
+
+      <!-- Install from paste -->
+      <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:12px;">
+        <div style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text3);margin-bottom:8px;">Paste Playbook Markdown</div>
+        <div style="display:flex;gap:8px;margin-bottom:6px;">
+          <input class="settings-input" id="pb-paste-name" type="text" placeholder="Playbook name" style="font-size:11px;">
+          <input class="settings-input" id="pb-paste-alloc" type="number" placeholder="$USDC" style="font-size:11px;max-width:80px;">
+        </div>
+        <textarea class="settings-input" id="pb-paste-plan" rows="4"
+          placeholder="## My Strategy — Plan&#10;&#10;**Objective:** ...&#10;&#10;### Entry Rules..."
+          style="font-size:11px;resize:vertical;min-height:80px;"></textarea>
+        <button onclick="installPlaybookFromPaste()" style="margin-top:6px;padding:6px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;color:var(--text2);font-family:var(--font-mono);font-size:11px;cursor:pointer;" onmouseover="this.style.borderColor='var(--cyan)';this.style.color='var(--cyan)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--text2)'">
+          Install Pasted Playbook
+        </button>
+      </div>
+
+      <!-- Install status -->
+      <div id="pb-install-status" style="display:none;margin-top:10px;padding:8px 12px;border-radius:5px;font-size:11px;"></div>
+    </div>
+
+    <!-- Anthropic -->
+    <div style="margin-bottom:28px;">
+      <div style="font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-bottom:12px;">Anthropic</div>
+      <div class="settings-row">
+        <label class="settings-label">API Key <span id="anthropic-status" class="settings-badge"></span></label>
+        <div style="display:flex;gap:8px;">
+          <input class="settings-input" id="s-anthropic-key" type="password" placeholder="sk-ant-api03-... (leave blank to keep current)">
+          <button class="settings-show-btn" onclick="toggleVisibility('s-anthropic-key', this)">Show</button>
+        </div>
+        <div class="settings-hint">Get yours at <a href="https://console.anthropic.com" target="_blank" style="color:var(--cyan)">console.anthropic.com</a></div>
+      </div>
+    </div>
+
+    <!-- Hyperliquid -->
+    <div style="margin-bottom:28px;">
+      <div style="font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-bottom:12px;">Hyperliquid</div>
+
+      <div class="settings-row">
+        <label class="settings-label">Wallet Address (Main Account) <span id="wallet-status" class="settings-badge"></span></label>
+        <input class="settings-input" id="s-wallet" type="text" placeholder="0x755695656fe1C005e3ba9e4D621209411f9aEC63">
+        <div class="settings-hint">Your main wallet address — where your funds are. Used to query balances and positions.</div>
+      </div>
+
+      <div class="settings-row" style="margin-top:14px;">
+        <label class="settings-label">Private Key (API Wallet) <span id="pk-status" class="settings-badge"></span></label>
+        <div style="display:flex;gap:8px;">
+          <input class="settings-input" id="s-pk" type="password" placeholder="0x... (leave blank to keep current)" oninput="deriveAddress(this.value)">
+          <button class="settings-show-btn" onclick="toggleVisibility('s-pk', this)">Show</button>
+        </div>
+        <div id="derived-address-box" style="display:none;margin-top:8px;padding:10px 12px;border-radius:6px;font-size:11px;line-height:1.6;"></div>
+        <div class="settings-hint">
+          Use your <strong style="color:var(--text)">API Wallet</strong> private key (safer) or your main wallet private key.<br>
+          Generate an API Wallet: <a href="https://app.hyperliquid.xyz/API" target="_blank" style="color:var(--cyan)">app.hyperliquid.xyz/API</a>
+        </div>
+      </div>
+
+      <div class="settings-row" style="margin-top:14px;">
+        <label class="settings-label">Vault Address <span style="color:var(--text3);font-size:10px">(optional)</span></label>
+        <input class="settings-input" id="s-vault" type="text" placeholder="0x... leave blank if not using a vault">
+      </div>
+    </div>
+
+    <!-- Network -->
+    <div style="margin-bottom:32px;">
+      <div style="font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-bottom:12px;">Network</div>
+      <div style="display:flex;gap:10px;">
+        <button class="net-btn active" id="net-mainnet" onclick="selectNetwork('mainnet')">
+          <span class="net-dot" style="background:var(--green)"></span>Mainnet
+        </button>
+        <button class="net-btn" id="net-testnet" onclick="selectNetwork('testnet')">
+          <span class="net-dot" style="background:var(--yellow)"></span>Testnet
+        </button>
+      </div>
+      <div class="settings-hint" style="margin-top:8px;">Mainnet for real trading. Testnet for safe testing with no real funds.</div>
+    </div>
+
+    <!-- Telegram -->
+    <div style="margin-bottom:28px;">
+      <div style="font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-bottom:12px;">
+        Async Approvals — Telegram
+      </div>
+      <div class="settings-row">
+        <label class="settings-label">Bot Token <span id="tg-status" class="settings-badge"></span></label>
+        <div style="display:flex;gap:8px;">
+          <input class="settings-input" id="s-tg-token" type="password" placeholder="123456:ABC-DEF... (leave blank to keep)">
+          <button class="settings-show-btn" onclick="toggleVisibility('s-tg-token', this)">Show</button>
+        </div>
+        <div class="settings-hint">
+          1. Message <strong style="color:var(--text)">@BotFather</strong> on Telegram → /newbot → copy token<br>
+          2. Send any message to your new bot to open the chat
+        </div>
+      </div>
+      <div class="settings-row" style="margin-top:14px;">
+        <label class="settings-label">Chat ID</label>
+        <div style="display:flex;gap:8px;">
+          <input class="settings-input" id="s-tg-chatid" type="text" placeholder="123456789">
+          <button class="settings-show-btn" onclick="getTelegramChatId()">Find</button>
+        </div>
+        <div class="settings-hint">Your Telegram user ID. Click <strong>Find</strong> after setting the token to get it automatically.</div>
+      </div>
+      <button onclick="testTelegram()" style="margin-top:10px;padding:7px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;color:var(--text2);font-family:var(--font-mono);font-size:11px;cursor:pointer;" onmouseover="this.style.borderColor='var(--cyan)';this.style.color='var(--cyan)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--text2)'">
+        Send test message ↗
+      </button>
+    </div>
+
+    <!-- Status -->
+    <div id="settings-status-box" style="display:none;margin-bottom:20px;padding:14px 16px;border-radius:var(--radius);font-size:12px;line-height:1.5;"></div>
+
+    <!-- Save button -->
+    <button onclick="saveSettings()" style="
+      width:100%;padding:14px;
+      background:var(--cyan);color:var(--bg);
+      border:none;border-radius:var(--radius);
+      font-family:var(--font-mono);font-size:13px;font-weight:700;
+      cursor:pointer;letter-spacing:0.5px;
+      transition:background 0.15s;
+    " onmouseover="this.style.background='var(--cyan2)'" onmouseout="this.style.background='var(--cyan)'">
+      Save Settings
+    </button>
+
+    <button onclick="testConnection()" style="
+      width:100%;padding:10px;margin-top:10px;
+      background:transparent;color:var(--text2);
+      border:1px solid var(--border2);border-radius:var(--radius);
+      font-family:var(--font-mono);font-size:12px;
+      cursor:pointer;transition:all 0.15s;
+    " onmouseover="this.style.borderColor='var(--cyan)';this.style.color='var(--cyan)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--text2)'">
+      Test Connection &amp; Signer
+    </button>
+
+    <div style="margin-top:28px;padding:16px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);">
+      <div style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text3);margin-bottom:8px;">🔒 Security</div>
+      <div style="font-size:11px;color:var(--text2);line-height:1.6;">
+        Your private key is stored only in the <code style="color:var(--cyan)">.env</code> file on your local machine and is never sent anywhere except directly to Hyperliquid for signing orders.<br><br>
+        For maximum security, use an <strong style="color:var(--text)">API Wallet</strong> (generated on Hyperliquid) instead of your main wallet private key — API wallets can trade but cannot withdraw funds.
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Notifications -->
 <div class="notifications" id="notifications"></div>
 
@@ -754,6 +1120,30 @@
     <div class="modal-actions">
       <button class="btn btn-cancel" onclick="closeModal('modal-playbook')">Cancel</button>
       <button class="btn btn-primary" onclick="createPlaybook()">Create</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- Create Skill Modal -->
+<div class="modal-overlay" id="modal-skill">
+  <div class="modal">
+    <h2>New Skill</h2>
+    <div class="form-group">
+      <label class="form-label">Name</label>
+      <input class="form-input" id="sk-name" placeholder="e.g. position-sizing">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Description (when to use this skill)</label>
+      <input class="form-input" id="sk-desc" placeholder="e.g. Use when sizing any new trade entry">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Content (markdown instructions)</label>
+      <textarea class="form-textarea" id="sk-content" style="min-height:160px;font-size:11px" placeholder="Write your technique here in plain text or markdown.&#10;&#10;Example:&#10;1. Risk per trade = 1% of account equity&#10;2. Position size = risk / (entry - stop loss)&#10;3. Never exceed 25% of equity in one position"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-cancel" onclick="closeModal('modal-skill')">Cancel</button>
+      <button class="btn btn-primary" onclick="createSkill()">Create</button>
     </div>
   </div>
 </div>
@@ -882,6 +1272,23 @@ function handleWsMessage(data) {
       break;
     case 'trigger_fired':
       notify(`⚡ Trigger fired: ${data.trigger.name}`, 'info');
+      break;
+    case 'playbook_installed':
+      if (!playbooks.find(p => p.id === data.playbook.id)) playbooks.unshift(data.playbook);
+      renderPlaybooks();
+      notify(`Playbook installed: ${data.playbook.name}`, 'success');
+      break;
+    case 'skill_installed':
+      if (!skills.find(s => s.id === data.skill.id)) skills.unshift(data.skill);
+      renderSkills();
+      break;
+    case 'settings_updated':
+      if (data.wallet) {
+        document.getElementById('wallet-display').textContent =
+          data.wallet.slice(0, 6) + '\u2026' + data.wallet.slice(-4);
+      }
+      document.getElementById('network-badge').textContent = data.network ?? '';
+      notify('Settings applied ✓', 'success');
       break;
     case 'error':
       finishAssistant();
@@ -1190,20 +1597,54 @@ async function resolveApproval(id, action) {
   const endpoint = `/api/approvals/${id}/${action}`;
   const btn = event.currentTarget;
   btn.disabled = true;
-  btn.textContent = '...';
+  btn.textContent = action === 'approve' ? 'Executing...' : '...';
 
   try {
     const res = await fetch(endpoint, { method: 'POST' });
     const data = await res.json();
-    updateApproval({ ...data.approval, ...data });
-    renderApprovals();
+
     if (action === 'approve') {
-      if (data.txResult?.error) notify(`Trade error: ${data.txResult.error}`, 'error');
-      else notify('Trade submitted to Hyperliquid', 'success');
+      if (data.txResult?.error) {
+        // Show error prominently in the card
+        notify(`✗ Trade failed: ${data.txResult.error}`, 'error');
+        // Re-enable button so user can retry
+        btn.disabled = false;
+        btn.textContent = 'Retry';
+        // Show error inline
+        const card = btn.closest('.approval-card');
+        if (card) {
+          let errEl = card.querySelector('.tx-error');
+          if (!errEl) {
+            errEl = document.createElement('div');
+            errEl.className = 'tx-error';
+            errEl.style.cssText = 'margin-top:8px;padding:8px 10px;background:var(--red-dim);border:1px solid rgba(255,51,102,0.3);border-radius:5px;font-size:11px;color:var(--red);line-height:1.5;';
+            card.appendChild(errEl);
+          }
+          errEl.textContent = '✗ ' + data.txResult.error;
+        }
+      } else {
+        // Success
+        const fill = data.txResult?.response?.data?.statuses?.[0]?.filled;
+        const resting = data.txResult?.response?.data?.statuses?.[0]?.resting;
+        if (fill) {
+          notify(`✓ Filled: ${fill.totalSz} ${data.approval?.coin} @ $${parseFloat(fill.avgPx).toFixed(4)}`, 'success');
+        } else if (resting) {
+          notify(`✓ Order resting in book: oid ${resting.oid}`, 'success');
+        } else {
+          notify('✓ Order submitted to Hyperliquid', 'success');
+        }
+        updateApproval({ ...data.approval, status: 'approved' });
+        renderApprovals();
+        loadJournal();
+      }
+    } else {
+      updateApproval({ ...data, status: 'rejected' });
+      renderApprovals();
     }
   } catch (err) {
     notify(`Request failed: ${err.message}`, 'error');
     btn.disabled = false;
+    btn.textContent = action === 'approve' ? '✓ Approve' : '✗ Reject';
   }
 }
 
@@ -1289,10 +1730,21 @@ function switchPanel(panel) {
 function switchView(view) {
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   event.currentTarget.classList.add('active');
-  // For now just switch panel to match
-  if (view === 'journal') switchPanel('journal');
-  if (view === 'market') switchPanel('market');
-  if (view === 'chat') switchPanel('approvals');
+
+  const chatMain    = document.getElementById('main-chat');
+  const settingsView = document.getElementById('settings-view');
+
+  if (view === 'settings') {
+    chatMain.style.display    = 'none';
+    settingsView.style.display = 'block';
+    loadSettings();
+  } else {
+    chatMain.style.display    = 'flex';
+    settingsView.style.display = 'none';
+    if (view === 'journal') switchPanel('journal');
+    if (view === 'market')  switchPanel('market');
+    if (view === 'chat')    switchPanel('approvals');
+  }
 }
 
 // ── Modals ────────────────────────────────────────────────────────────────────
@@ -1327,10 +1779,467 @@ function formatPrice(p) {
   return n.toPrecision(4);
 }
 
+
+
+
+// ── Skill Store ───────────────────────────────────────────────────────────────
+
+let _registryData = null;
+
+async function loadRegistry() {
+  const url = document.getElementById('registry-url').value.trim();
+  const resultsEl = document.getElementById('registry-results');
+  resultsEl.innerHTML = '<div style="font-size:11px;color:var(--text3);text-align:center;padding:16px;">Loading registry...</div>';
+
+  try {
+    const res  = await fetch(`/api/skills/registry?url=${encodeURIComponent(url)}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    _registryData = data;
+    renderRegistry(data);
+  } catch(e) {
+    resultsEl.innerHTML = `<div style="font-size:11px;color:var(--red);padding:10px;">✗ ${escHtml(e.message)}</div>`;
+  }
+}
+
+function renderRegistry(data) {
+  const el = document.getElementById('registry-results');
+  if (!data.skills?.length) {
+    el.innerHTML = '<div style="font-size:11px;color:var(--text3);text-align:center;padding:16px;">No skills in registry</div>';
+    return;
+  }
+
+  el.innerHTML = `
+    <div style="font-size:10px;color:var(--text3);margin-bottom:8px;">${data.skills.length} skills available · v${data.version} · updated ${data.updated}</div>
+    ${data.skills.map(s => `
+      <div class="registry-card" id="reg-card-${escHtml(s.id)}">
+        <div class="registry-card-info">
+          <div class="registry-card-name">
+            ${escHtml(s.name)}
+            <span style="font-size:9px;color:var(--text3)">v${escHtml(s.version)}</span>
+            ${s.installed ? '<span style="font-size:9px;color:var(--green)">✓ installed</span>' : ''}
+          </div>
+          <div class="registry-card-desc">${escHtml(s.description)}</div>
+          <div class="registry-card-meta">
+            <span>by ${escHtml(s.author)}</span>
+            ${(s.tags||[]).map(t => `<span class="skill-tag">${escHtml(t)}</span>`).join('')}
+            ${s.previewUrl ? `<a href="${escHtml(s.previewUrl)}" target="_blank" style="color:var(--cyan);font-size:10px;">view ↗</a>` : ''}
+          </div>
+        </div>
+        ${s.installed
+          ? `<button class="registry-install-btn installed" disabled>✓ Installed</button>`
+          : `<button class="registry-install-btn" onclick="installSkill('${escHtml(s.url)}', '${escHtml(s.id)}')">Install</button>`
+        }
+      </div>
+    `).join('')}
+  `;
+}
+
+async function installSkill(url, id) {
+  const btn = document.querySelector(`#reg-card-${id} .registry-install-btn`);
+  if (btn) { btn.disabled = true; btn.textContent = 'Installing...'; }
+
+  try {
+    const res  = await fetch('/api/skills/install', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+
+    // Update button
+    if (btn) {
+      btn.className = 'registry-install-btn installed';
+      btn.textContent = '✓ Installed';
+    }
+    // Add to sidebar
+    skills.unshift(data.skill);
+    renderSkills();
+    showInstallStatus(`✓ "${data.skill.name}" installed`, 'success');
+  } catch(e) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Install'; }
+    showInstallStatus('✗ ' + e.message, 'error');
+  }
+}
+
+async function installFromUrl() {
+  const url = document.getElementById('install-url').value.trim();
+  if (!url) { showInstallStatus('Insert a URL first', 'error'); return; }
+  await installSkill(url, 'custom-' + Date.now());
+  document.getElementById('install-url').value = '';
+}
+
+async function installFromPaste() {
+  const content = document.getElementById('paste-skill').value.trim();
+  if (!content) { showInstallStatus('Paste skill content first', 'error'); return; }
+
+  try {
+    const res  = await fetch('/api/skills/install-raw', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content }),
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+    skills.unshift(data.skill);
+    renderSkills();
+    document.getElementById('paste-skill').value = '';
+    showInstallStatus(`✓ "${data.skill.name}" installed`, 'success');
+  } catch(e) {
+    showInstallStatus('✗ ' + e.message, 'error');
+  }
+}
+
+function showInstallStatus(msg, type) {
+  const el = document.getElementById('install-status');
+  el.textContent = msg;
+  el.style.display = 'block';
+  el.style.background = type === 'success' ? 'var(--green-dim)' : 'var(--red-dim)';
+  el.style.border     = type === 'success' ? '1px solid rgba(0,255,136,0.3)' : '1px solid rgba(255,51,102,0.3)';
+  el.style.color      = type === 'success' ? 'var(--green)' : 'var(--red)';
+  setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+
+// ── Skills ────────────────────────────────────────────────────────────────────
+
+let skills = [];
+
+async function loadSkills() {
+  try {
+    const res = await fetch('/api/skills');
+    skills = await res.json();
+    renderSkills();
+  } catch {}
+}
+
+function renderSkills() {
+  const el = document.getElementById('skills-list');
+  if (!el) return;
+  if (skills.length === 0) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-text">No skills yet.<br>Add reusable trading techniques.</div></div>';
+    return;
+  }
+  el.innerHTML = skills.map(s => `
+    <div class="trig-item" style="cursor:default">
+      <div class="trig-name">${escHtml(s.name)}</div>
+      <div class="trig-meta" style="font-size:10px;color:var(--text3);margin-top:2px">${escHtml(s.description || '')}</div>
+      <div style="margin-top:4px;display:flex;gap:4px;">
+        <button onclick="editSkill('${s.id}')" style="background:none;border:1px solid var(--border2);border-radius:3px;color:var(--text3);font-size:9px;padding:1px 6px;cursor:pointer;font-family:var(--font-mono)">edit</button>
+        <button onclick="deleteSkill('${s.id}')" style="background:none;border:1px solid var(--border2);border-radius:3px;color:var(--red);font-size:9px;padding:1px 6px;cursor:pointer;font-family:var(--font-mono)">del</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function openCreateSkill() {
+  document.getElementById('sk-name').value = '';
+  document.getElementById('sk-desc').value = '';
+  document.getElementById('sk-content').value = '';
+  document.getElementById('modal-skill').classList.add('open');
+}
+
+async function createSkill() {
+  const name    = document.getElementById('sk-name').value.trim();
+  const desc    = document.getElementById('sk-desc').value.trim();
+  const content = document.getElementById('sk-content').value.trim();
+  if (!name || !content) { notify('Name and content are required', 'error'); return; }
+  const res = await fetch('/api/skills', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, description: desc, content }),
+  });
+  const sk = await res.json();
+  skills.unshift(sk);
+  renderSkills();
+  closeModal('modal-skill');
+  notify(`Skill created: ${sk.name}`, 'success');
+}
+
+async function editSkill(id) {
+  const sk = skills.find(s => s.id === id);
+  if (!sk) return;
+  document.getElementById('sk-name').value    = sk.name;
+  document.getElementById('sk-desc').value    = sk.description;
+  document.getElementById('sk-content').value = sk.content;
+  document.getElementById('modal-skill').classList.add('open');
+  // Override create button to update instead
+  document.querySelector('#modal-skill .btn-primary').onclick = async () => {
+    await fetch(`/api/skills/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name:        document.getElementById('sk-name').value.trim(),
+        description: document.getElementById('sk-desc').value.trim(),
+        content:     document.getElementById('sk-content').value.trim(),
+      }),
+    });
+    await loadSkills();
+    closeModal('modal-skill');
+    notify('Skill updated', 'success');
+    // Reset to create mode
+    document.querySelector('#modal-skill .btn-primary').onclick = createSkill;
+  };
+}
+
+async function deleteSkill(id) {
+  if (!confirm('Delete this skill?')) return;
+  await fetch(`/api/skills/${id}`, { method: 'DELETE' });
+  skills = skills.filter(s => s.id !== id);
+  renderSkills();
+  notify('Skill deleted', 'info');
+}
+
+// ── Telegram ──────────────────────────────────────────────────────────────────
+
+async function loadTelegramStatus() {
+  try {
+    const res  = await fetch('/api/telegram/status');
+    const data = await res.json();
+    const badge = document.getElementById('tg-status');
+    if (badge) {
+      badge.textContent = data.configured ? '✓ active' : 'not set';
+      badge.className   = 'settings-badge ' + (data.configured ? 'badge-ok' : 'badge-missing');
+    }
+    if (data.chatId) {
+      const el = document.getElementById('s-tg-chatid');
+      if (el && !el.value) el.value = data.chatId;
+    }
+  } catch {}
+}
+
+async function getTelegramChatId() {
+  const token = document.getElementById('s-tg-token').value.trim()
+    || (await fetch('/api/telegram/status').then(r=>r.json()).then(d => d.token !== 'not set' ? 'current' : null));
+
+  if (!token || token === 'not set') {
+    showSettingsStatus('Inserisci prima il Bot Token', 'error');
+    return;
+  }
+
+  showSettingsStatus('Cerco il Chat ID...', 'info');
+  try {
+    // Use current token if not provided
+    const useToken = document.getElementById('s-tg-token').value.trim();
+    if (!useToken) {
+      showSettingsStatus('Inserisci il token prima di cercare il Chat ID', 'error');
+      return;
+    }
+    const res  = await fetch(`https://api.telegram.org/bot${useToken}/getUpdates`);
+    const data = await res.json();
+    const chatId = data.result?.[0]?.message?.chat?.id
+                ?? data.result?.[0]?.callback_query?.message?.chat?.id;
+
+    if (chatId) {
+      document.getElementById('s-tg-chatid').value = String(chatId);
+      showSettingsStatus(`✓ Chat ID trovato: ${chatId}`, 'success');
+    } else {
+      showSettingsStatus('Nessun aggiornamento trovato. Invia un messaggio al tuo bot su Telegram e riprova.', 'error');
+    }
+  } catch(e) {
+    showSettingsStatus('Errore: ' + e.message, 'error');
+  }
+}
+
+async function testTelegram() {
+  showSettingsStatus('Invio messaggio di test...', 'info');
+  try {
+    const res  = await fetch('/api/telegram/test', { method: 'POST' });
+    const data = await res.json();
+    if (data.ok) showSettingsStatus('✓ Messaggio inviato su Telegram!', 'success');
+    else showSettingsStatus('✗ ' + (data.error ?? 'Errore sconosciuto'), 'error');
+  } catch(e) {
+    showSettingsStatus('✗ ' + e.message, 'error');
+  }
+}
+
+// ── Settings ───────────────────────────────────────────────────────────────────
+
+let selectedNetwork = 'mainnet';
+
+async function loadSettings() {
+  try {
+    const res = await fetch('/api/settings');
+    const data = await res.json();
+
+    // Populate wallet address (non-sensitive)
+    if (data.walletAddress) document.getElementById('s-wallet').value = data.walletAddress;
+    if (data.vaultAddress)  document.getElementById('s-vault').value  = data.vaultAddress;
+
+    // Status badges
+    document.getElementById('anthropic-status').textContent  = data.anthropicKeySet ? '✓ set' : 'not set';
+    document.getElementById('anthropic-status').className    = 'settings-badge ' + (data.anthropicKeySet ? 'badge-ok' : 'badge-missing');
+    document.getElementById('pk-status').textContent         = data.privateKeySet   ? '✓ set' : 'not set';
+    document.getElementById('pk-status').className           = 'settings-badge ' + (data.privateKeySet   ? 'badge-ok' : 'badge-missing');
+    document.getElementById('wallet-status').textContent     = data.walletAddress   ? '✓ set' : 'not set';
+    document.getElementById('wallet-status').className       = 'settings-badge ' + (data.walletAddress   ? 'badge-ok' : 'badge-missing');
+
+    // Network selector
+    selectedNetwork = data.network || 'mainnet';
+    selectNetwork(selectedNetwork, true);
+    await loadTelegramStatus();
+  } catch(e) {
+    console.error('Could not load settings:', e);
+  }
+}
+
+function selectNetwork(net, silent = false) {
+  selectedNetwork = net;
+  document.getElementById('net-mainnet').classList.toggle('active', net === 'mainnet');
+  document.getElementById('net-testnet').classList.toggle('active', net === 'testnet');
+}
+
+function deriveAddress(pk) {
+  const box = document.getElementById('derived-address-box');
+  if (!pk || pk.length < 10) { box.style.display = 'none'; return; }
+
+  try {
+    // Normalize key
+    const key = pk.startsWith('0x') ? pk : '0x' + pk;
+    const wallet = new ethers.Wallet(key);
+    const derived = wallet.address;
+
+    const walletInput = document.getElementById('s-wallet').value.trim();
+    const matches = walletInput && derived.toLowerCase() === walletInput.toLowerCase();
+
+    box.style.display = 'block';
+
+    if (matches) {
+      box.style.background = 'var(--green-dim)';
+      box.style.border = '1px solid rgba(0,255,136,0.3)';
+      box.style.color = 'var(--green)';
+      box.innerHTML = `✓ Chiave valida — corrisponde al wallet address<br><span style="color:var(--text2);font-size:10px">${derived}</span>`;
+    } else if (walletInput) {
+      box.style.background = 'var(--red-dim)';
+      box.style.border = '1px solid rgba(255,51,102,0.3)';
+      box.style.color = 'var(--red)';
+      box.innerHTML = `⚠ Questa chiave appartiene a un indirizzo diverso:<br>
+        <span style="font-size:10px;word-break:break-all">Chiave → <strong>${derived}</strong></span><br>
+        <span style="font-size:10px;word-break:break-all">Wallet  → <strong>${walletInput}</strong></span><br>
+        <span style="font-size:10px;opacity:0.8">Se vuoi usare questa chiave, aggiorna anche il Wallet Address sopra.</span>`;
+    } else {
+      box.style.background = 'var(--cyan-dim)';
+      box.style.border = '1px solid rgba(0,212,255,0.25)';
+      box.style.color = 'var(--cyan)';
+      box.innerHTML = `Indirizzo derivato dalla chiave:<br><strong style="word-break:break-all">${derived}</strong>`;
+    }
+  } catch(e) {
+    box.style.display = 'block';
+    box.style.background = 'var(--red-dim)';
+    box.style.border = '1px solid rgba(255,51,102,0.3)';
+    box.style.color = 'var(--red)';
+    box.innerHTML = '✗ Chiave privata non valida: ' + e.message;
+  }
+}
+
+async function saveSettings() {
+  const body = {
+    network: selectedNetwork,
+  };
+
+  const wallet = document.getElementById('s-wallet').value.trim();
+  const pk     = document.getElementById('s-pk').value.trim();
+  const vault  = document.getElementById('s-vault').value.trim();
+  const apiKey = document.getElementById('s-anthropic-key').value.trim();
+
+  if (wallet) body.walletAddress  = wallet;
+  if (pk)     body.privateKey     = pk;
+  if (vault)  body.vaultAddress   = vault;
+  if (apiKey) body.anthropicKey   = apiKey;
+
+  const tgToken  = document.getElementById('s-tg-token').value.trim();
+  const tgChatId = document.getElementById('s-tg-chatid').value.trim();
+  if (tgToken)  body.telegramToken  = tgToken;
+  if (tgChatId) body.telegramChatId = tgChatId;
+
+  // Basic validation
+  if (wallet && !wallet.startsWith('0x')) {
+    showSettingsStatus('Wallet address must start with 0x', 'error'); return;
+  }
+  if (pk && !pk.startsWith('0x')) {
+    showSettingsStatus('Private key must start with 0x', 'error'); return;
+  }
+
+  try {
+    const res = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+
+    if (data.ok) {
+      // Clear sensitive fields after save
+      document.getElementById('s-pk').value = '';
+      document.getElementById('s-tg-token').value = '';
+      document.getElementById('s-anthropic-key').value = '';
+
+      showSettingsStatus(
+        `✓ Settings saved — Wallet: ${data.wallet ? data.wallet.slice(0,10)+'…' : 'not set'} | Network: ${data.network} | Signer: ${data.hasSigner ? 'ready ✓' : 'not configured'}`,
+        'success'
+      );
+      await loadSettings();
+    } else {
+      showSettingsStatus('Error: ' + JSON.stringify(data), 'error');
+    }
+  } catch(err) {
+    showSettingsStatus('Request failed: ' + err.message, 'error');
+  }
+}
+
+async function testConnection() {
+  showSettingsStatus('Testing connection...', 'info');
+  try {
+    const res  = await fetch('/api/debug/test-connection');
+    const data = await res.json();
+    if (data.ok) {
+      const acct = data.accountValue;
+      const lines = [
+        `✓ Hyperliquid reachable — BTC: $${parseFloat(data.btcPrice).toFixed(2)}`,
+        `✓ Wallet: ${data.wallet ? data.wallet.slice(0,10)+'…' : 'not configured'}`,
+        `✓ Signer: ${data.hasSigner ? 'configured (addr: '+data.signerAddress?.slice(0,10)+'…)' : '✗ NOT configured — add private key'}`,
+        acct ? `✓ Balance: $${parseFloat(acct.accountValue).toFixed(2)} USDC (perps: $${parseFloat(acct.perpEquity).toFixed(2)}, spot: $${parseFloat(acct.spotUsdc).toFixed(2)})` : '— no wallet',
+      ];
+      showSettingsStatus(lines.join('\n'), 'success');
+    } else {
+      showSettingsStatus('✗ ' + data.error, 'error');
+    }
+  } catch(e) {
+    showSettingsStatus('✗ Connection failed: ' + e.message, 'error');
+  }
+}
+
+function showSettingsStatus(msg, type) {
+  const box = document.getElementById('settings-status-box');
+  box.innerHTML = msg.split('\n').map(l => `<div>${escHtml(l)}</div>`).join('');
+  box.style.display = 'block';
+  const colors = {
+    success: ['var(--green-dim)',  'rgba(0,255,136,0.3)',  'var(--green)'],
+    error:   ['var(--red-dim)',    'rgba(255,51,102,0.3)', 'var(--red)'],
+    info:    ['var(--cyan-dim)',   'rgba(0,212,255,0.25)', 'var(--cyan)'],
+  };
+  const [bg, border, color] = colors[type] ?? colors.info;
+  box.style.background = bg;
+  box.style.border     = `1px solid ${border}`;
+  box.style.color      = color;
+}
+
+function toggleVisibility(inputId, btn) {
+  const input = document.getElementById(inputId);
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.textContent = 'Hide';
+  } else {
+    input.type = 'password';
+    btn.textContent = 'Show';
+  }
+}
+
 // ── Boot ──────────────────────────────────────────────────────────────────────
 
 connect();
 loadMarket();
+loadSkills();
 
 async function pollAccount() {
   try {

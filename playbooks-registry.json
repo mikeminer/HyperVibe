@@ -1,0 +1,61 @@
+{
+  "version": "1.0",
+  "updated": "2026-03-29",
+  "playbooks": [
+    {
+      "id": "hype-momentum-scalp",
+      "name": "HYPE Momentum Scalp",
+      "description": "Short-term momentum trades on HYPE-PERP. 4h trend, 1h entry, tight stops. Designed for small accounts $15–$100.",
+      "author": "pappardelle.eth",
+      "version": "1.0.0",
+      "allocation": 15,
+      "tags": ["hype", "momentum", "scalp", "small-account"],
+      "url": "https://raw.githubusercontent.com/mikeminer/HyperVibe/main/playbooks/hype-momentum-scalp.md",
+      "previewUrl": "https://github.com/mikeminer/HyperVibe/blob/main/playbooks/hype-momentum-scalp.md"
+    },
+    {
+      "id": "funding-arbitrage",
+      "name": "Funding Rate Arbitrage",
+      "description": "Fades extreme funding rates. Shorts when funding is extreme positive, longs when extreme negative. Market-neutral bias.",
+      "author": "pappardelle.eth",
+      "version": "1.0.0",
+      "allocation": 20,
+      "tags": ["funding", "arbitrage", "market-neutral"],
+      "url": "https://raw.githubusercontent.com/mikeminer/HyperVibe/main/playbooks/funding-arbitrage.md",
+      "previewUrl": "https://github.com/mikeminer/HyperVibe/blob/main/playbooks/funding-arbitrage.md"
+    },
+    {
+      "id": "btc-eth-trend",
+      "name": "BTC/ETH Trend Follower",
+      "description": "Follows the macro trend on BTC and ETH perpetuals. Daily/4h timeframe. Swing trades, holds 1–5 days.",
+      "author": "pappardelle.eth",
+      "version": "1.0.0",
+      "allocation": 30,
+      "tags": ["btc", "eth", "trend", "swing"],
+      "url": "https://raw.githubusercontent.com/mikeminer/HyperVibe/main/playbooks/btc-eth-trend.md",
+      "previewUrl": "https://github.com/mikeminer/HyperVibe/blob/main/playbooks/btc-eth-trend.md"
+    },
+    {
+      "id": "openclaw-autonomous",
+      "name": "OpenClaw Autonomous",
+      "description": "Full autonomous pipeline: OpenClaw 3-agent analysis on every trigger. Morning scan + hourly review. Best with all 5 skills installed.",
+      "author": "pappardelle.eth",
+      "version": "1.0.0",
+      "allocation": 15,
+      "tags": ["autonomous", "openclaw", "multi-coin"],
+      "url": "https://raw.githubusercontent.com/mikeminer/HyperVibe/main/playbooks/openclaw-autonomous.md",
+      "previewUrl": "https://github.com/mikeminer/HyperVibe/blob/main/playbooks/openclaw-autonomous.md"
+    },
+    {
+      "id": "top-mover-breakout",
+      "name": "Top Mover Breakout",
+      "description": "Scans top movers every morning. Enters breakouts on the strongest coin of the day. Single position, tight stop.",
+      "author": "pappardelle.eth",
+      "version": "1.0.0",
+      "allocation": 10,
+      "tags": ["breakout", "scanner", "momentum"],
+      "url": "https://raw.githubusercontent.com/mikeminer/HyperVibe/main/playbooks/top-mover-breakout.md",
+      "previewUrl": "https://github.com/mikeminer/HyperVibe/blob/main/playbooks/top-mover-breakout.md"
+    }
+  ]
+}

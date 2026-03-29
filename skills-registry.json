@@ -1,0 +1,56 @@
+{
+  "version": "1.0",
+  "updated": "2026-03-29",
+  "skills": [
+    {
+      "id": "openclaw-3-agent",
+      "name": "OpenClaw 3-Agent Pipeline",
+      "description": "Full Monte Carlo analysis → Kelly sizing → TP/SL exit ladder. Applies before every trade entry.",
+      "author": "pappardelle.eth",
+      "version": "1.0.0",
+      "tags": ["analysis", "sizing", "exit", "monte-carlo", "kelly"],
+      "url": "https://raw.githubusercontent.com/mikeminer/HyperVibe/main/skills/openclaw-3-agent.md",
+      "previewUrl": "https://github.com/mikeminer/HyperVibe/blob/main/skills/openclaw-3-agent.md"
+    },
+    {
+      "id": "funding-rate-filter",
+      "name": "Funding Rate Filter",
+      "description": "Checks funding rate before any entry. Avoids longs when funding is extreme, fades high funding as a contrarian signal.",
+      "author": "pappardelle.eth",
+      "version": "1.0.0",
+      "tags": ["filter", "funding", "risk"],
+      "url": "https://raw.githubusercontent.com/mikeminer/HyperVibe/main/skills/funding-rate-filter.md",
+      "previewUrl": "https://github.com/mikeminer/HyperVibe/blob/main/skills/funding-rate-filter.md"
+    },
+    {
+      "id": "unified-account-sizing",
+      "name": "Unified Account Sizing",
+      "description": "Position sizing rules specific to Hyperliquid Unified Account — combines spot USDC + perp equity as margin.",
+      "author": "pappardelle.eth",
+      "version": "1.0.0",
+      "tags": ["sizing", "unified-account", "margin"],
+      "url": "https://raw.githubusercontent.com/mikeminer/HyperVibe/main/skills/unified-account-sizing.md",
+      "previewUrl": "https://github.com/mikeminer/HyperVibe/blob/main/skills/unified-account-sizing.md"
+    },
+    {
+      "id": "hype-momentum",
+      "name": "HYPE Momentum Strategy",
+      "description": "Specific setup rules for trading HYPE perpetuals. EMA alignment, volume confirmation, funding awareness.",
+      "author": "pappardelle.eth",
+      "version": "1.0.0",
+      "tags": ["hype", "momentum", "strategy"],
+      "url": "https://raw.githubusercontent.com/mikeminer/HyperVibe/main/skills/hype-momentum.md",
+      "previewUrl": "https://github.com/mikeminer/HyperVibe/blob/main/skills/hype-momentum.md"
+    },
+    {
+      "id": "drawdown-guard",
+      "name": "Drawdown Guard",
+      "description": "Daily and weekly drawdown rules. Automatically reduces size or halts trading when thresholds are hit.",
+      "author": "pappardelle.eth",
+      "version": "1.0.0",
+      "tags": ["risk", "drawdown", "circuit-breaker"],
+      "url": "https://raw.githubusercontent.com/mikeminer/HyperVibe/main/skills/drawdown-guard.md",
+      "previewUrl": "https://github.com/mikeminer/HyperVibe/blob/main/skills/drawdown-guard.md"
+    }
+  ]
+}

@@ -1,13 +1,11 @@
 /**
  * Hyperliquid action signer
- * Implements the L1 EIP-712 signing scheme required by the exchange API.
- * Reference: https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/exchange-endpoint
+ * Uses @msgpack/msgpack for encoding — compatible with Hyperliquid's L1 signing.
  */
 
 import { ethers } from 'ethers';
-import { pack } from 'msgpackr';
+import { encode } from '@msgpack/msgpack';
 
-// Hyperliquid uses chainId 1337 for their L1
 const HL_CHAIN_ID = 1337;
 
 const AGENT_DOMAIN = {
@@ -24,23 +22,20 @@ const AGENT_TYPES = {
   ],
 };
 
-/**
- * Hash a Hyperliquid action using msgpack + keccak256.
- * Layout: msgpack(action) | uint64BE(nonce) | (vaultAddress bytes | 0x00)
- */
 function hashAction(action, nonce, vaultAddress = null) {
-  const actionBytes = pack(action);
+  const actionBytes = encode(action);
   const nonceBuf = Buffer.alloc(8);
   nonceBuf.writeBigUInt64BE(BigInt(nonce));
 
   let suffix;
   if (vaultAddress) {
-    suffix = Buffer.from(vaultAddress.replace('0x', ''), 'hex');
+    const vaultBytes = Buffer.from(vaultAddress.replace('0x', ''), 'hex');
+    suffix = Buffer.concat([Buffer.from([0x01]), vaultBytes]);
   } else {
     suffix = Buffer.from([0x00]);
   }
 
-  const full = Buffer.concat([actionBytes, nonceBuf, suffix]);
+  const full = Buffer.concat([Buffer.from(actionBytes), nonceBuf, suffix]);
   return ethers.keccak256(full);
 }
 
@@ -51,47 +46,19 @@ export class HyperliquidSigner {
     this.isMainnet = network === 'mainnet';
   }
 
-  /**
-   * Sign a Hyperliquid action and return { r, s, v } signature.
-   */
   async sign(action, nonce, vaultAddress = null) {
     const actionHash = hashAction(action, nonce, vaultAddress);
-
     const agent = {
       source: this.isMainnet ? 'a' : 'b',
       connectionId: actionHash,
     };
-
     const rawSig = await this.wallet.signTypedData(AGENT_DOMAIN, AGENT_TYPES, agent);
     const sig = ethers.Signature.from(rawSig);
-
     return { r: sig.r, s: sig.s, v: sig.v };
   }
 
-  /**
-   * Build and sign an order action.
-   * @param {object} params
-   * @param {number} params.assetIndex  - integer index from meta.universe
-   * @param {boolean} params.isBuy
-   * @param {string} params.price       - string, '0' for market
-   * @param {string} params.size        - string
-   * @param {boolean} params.reduceOnly
-   * @param {'Gtc'|'Ioc'|'Alo'} params.tif
-   * @param {string|null} params.vaultAddress
-   */
   async buildOrderAction(params) {
-    const {
-      assetIndex,
-      isBuy,
-      price,
-      size,
-      reduceOnly = false,
-      tif = 'Gtc',
-      vaultAddress = null,
-    } = params;
-
-    const isMarket = price === '0' || tif === 'Ioc';
-
+    const { assetIndex, isBuy, price, size, reduceOnly = false, tif = 'Gtc', vaultAddress = null } = params;
     const action = {
       type: 'order',
       orders: [{
@@ -100,24 +67,16 @@ export class HyperliquidSigner {
         p: price,
         s: size,
         r: reduceOnly,
-        t: isMarket
-          ? { limit: { tif: 'Ioc' } }
-          : { limit: { tif } },
+        t: { limit: { tif } },
       }],
       grouping: 'na',
     };
-
     const nonce = Date.now();
     const signature = await this.sign(action, nonce, vaultAddress);
-
     return { action, nonce, signature, vaultAddress };
   }
 
-  /**
-   * Build and sign a cancel action.
-   */
   async buildCancelAction(cancels, vaultAddress = null) {
-    // cancels: [{ assetIndex, oid }]
     const action = {
       type: 'cancel',
       cancels: cancels.map(c => ({ a: c.assetIndex, o: c.oid })),
@@ -127,58 +86,73 @@ export class HyperliquidSigner {
     return { action, nonce, signature, vaultAddress };
   }
 
-  /**
-   * Build and sign a modify order action.
-   */
   async buildModifyAction(params, vaultAddress = null) {
     const { oid, assetIndex, isBuy, price, size, reduceOnly = false, tif = 'Gtc' } = params;
     const action = {
       type: 'batchModify',
-      modifies: [{
-        oid,
-        order: {
-          a: assetIndex,
-          b: isBuy,
-          p: price,
-          s: size,
-          r: reduceOnly,
-          t: { limit: { tif } },
-        },
-      }],
+      modifies: [{ oid, order: { a: assetIndex, b: isBuy, p: price, s: size, r: reduceOnly, t: { limit: { tif } } } }],
     };
     const nonce = Date.now();
     const signature = await this.sign(action, nonce, vaultAddress);
     return { action, nonce, signature, vaultAddress };
   }
 
-  /**
-   * Build and sign a set leverage action.
-   */
   async buildSetLeverageAction(assetIndex, leverage, isCross = true, vaultAddress = null) {
-    const action = {
-      type: 'updateLeverage',
-      asset: assetIndex,
-      isCross,
-      leverage,
-    };
+    const action = { type: 'updateLeverage', asset: assetIndex, isCross, leverage };
     const nonce = Date.now();
     const signature = await this.sign(action, nonce, vaultAddress);
     return { action, nonce, signature, vaultAddress };
   }
 
   /**
-   * Compute slippage-adjusted price for market orders.
-   * Buy: +slippage%, Sell: -slippage%
+   * Build a native Hyperliquid trigger order (stop loss or take profit).
+   * These appear as real orders on Hyperliquid's UI and survive HyperVibe restarts.
    */
+  async buildTriggerOrderAction(params) {
+    const {
+      assetIndex, isBuy, triggerPx, size,
+      isMarket = true, limitPx = null, tpsl = 'sl', vaultAddress = null,
+    } = params;
+
+    const order = {
+      a: assetIndex,
+      b: isBuy,
+      p: isMarket ? '0' : (limitPx ?? triggerPx),
+      s: size,
+      r: true,
+      t: { trigger: { triggerPx, isMarket, tpsl } },
+    };
+
+    const action = { type: 'order', orders: [order], grouping: 'na' };
+    const nonce = Date.now();
+    const signature = await this.sign(action, nonce, vaultAddress);
+    return { action, nonce, signature, vaultAddress };
+  }
+
+  /**
+   * Build a batch of exit orders (SL + TPs) in a single action.
+   */
+  async buildExitBatchAction(assetIndex, orders, vaultAddress = null) {
+    const hlOrders = orders.map(o => ({
+      a: assetIndex,
+      b: o.isBuy,
+      p: o.isMarket ? '0' : (o.limitPx ?? o.triggerPx),
+      s: o.size,
+      r: true,
+      t: { trigger: { triggerPx: o.triggerPx, isMarket: o.isMarket ?? true, tpsl: o.tpsl } },
+    }));
+
+    const action = { type: 'order', orders: hlOrders, grouping: 'positionTpsl' };
+    const nonce = Date.now();
+    const signature = await this.sign(action, nonce, vaultAddress);
+    return { action, nonce, signature, vaultAddress };
+  }
+
   static marketPrice(midPx, isBuy, slippagePct = 3) {
     const factor = isBuy ? 1 + slippagePct / 100 : 1 - slippagePct / 100;
-    // Round to 5 sig figs (Hyperliquid requirement)
     return (midPx * factor).toPrecision(5);
   }
 
-  /**
-   * Format size to the correct number of decimals for the asset.
-   */
   static formatSize(size, szDecimals) {
     return parseFloat(size).toFixed(szDecimals);
   }
