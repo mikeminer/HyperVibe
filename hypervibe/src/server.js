@@ -301,7 +301,7 @@ export async function createApp(config) {
       const r = await fetch(registryUrl, { signal: AbortSignal.timeout(8000) });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const data = await r.json();
-      const installed = Playbooks.list().map(p => p.name);
+      const installed = (await Playbooks.list()).map(p => p.name);
       data.playbooks = (data.playbooks ?? []).map(p => ({
         ...p,
         installed: installed.includes(p.name),
