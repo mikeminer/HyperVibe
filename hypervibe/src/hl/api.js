@@ -29,10 +29,12 @@ export class HyperliquidAPI {
   }
 
   async _exchange(payload) {
+    const body = JSON.stringify(payload);
+    console.log('[HL API] POST /exchange body:', body.slice(0, 500));
     const res = await fetch(`${this.base}/exchange`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body,
     });
     if (!res.ok) throw new Error(`Hyperliquid exchange API error: ${res.status}`);
     return res.json();

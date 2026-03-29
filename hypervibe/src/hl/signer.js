@@ -64,7 +64,7 @@ export class HyperliquidSigner {
       orders: [{
         a: assetIndex,
         b: isBuy,
-        p: price,
+        p: HyperliquidSigner.normalizePrice(price),  // strip trailing zeros
         s: size,
         r: reduceOnly,
         t: { limit: { tif } },
@@ -150,7 +150,16 @@ export class HyperliquidSigner {
 
   static marketPrice(midPx, isBuy, slippagePct = 3) {
     const factor = isBuy ? 1 + slippagePct / 100 : 1 - slippagePct / 100;
-    return (midPx * factor).toPrecision(5);
+    return HyperliquidSigner.normalizePrice((midPx * factor).toPrecision(5));
+  }
+
+  /**
+   * Normalize a price string to match Hyperliquid's Python normalization.
+   * Python strips trailing zeros: "40.480" → "40.48", "41.000" → "41"
+   */
+  static normalizePrice(s) {
+    if (!String(s).includes('.')) return String(s);
+    return String(s).replace(/\.?0+$/, '');
   }
 
   static formatSize(size, szDecimals) {

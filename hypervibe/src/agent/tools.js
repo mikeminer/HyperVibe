@@ -1,7 +1,6 @@
 /**
- * The 20 Hyperliquid tools available to the agent.
- * Read tools: free, no approval.
- * Write tools (place_order, cancel_order, etc.): require approval gate.
+ * HyperVibe — 21 tools for Claude
+ * Read tools: no approval. Write tools: approval gate.
  */
 
 import { HyperliquidSigner } from '../hl/signer.js';
@@ -10,32 +9,27 @@ import { Playbooks } from '../primitives/playbooks.js';
 import { Triggers, scheduleCronTrigger } from '../primitives/triggers.js';
 import { Learnings } from '../primitives/learnings.js';
 
-// Tool definitions (for Claude's tools parameter)
+// ── Tool definitions ───────────────────────────────────────────────────────────
+
 export const TOOL_DEFINITIONS = [
   {
     name: 'get_price',
-    description: 'Get the current mid price for one or more Hyperliquid perpetual coins.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        coins: { type: 'array', items: { type: 'string' }, description: 'e.g. ["BTC", "ETH", "HYPE"]' },
-      },
-      required: ['coins'],
-    },
+    description: 'Get current mid price for one or more Hyperliquid perpetual coins.',
+    input_schema: { type: 'object', properties: { coins: { type: 'array', items: { type: 'string' } } }, required: ['coins'] },
   },
   {
     name: 'get_all_mids',
-    description: 'Get current mid prices for all perpetual markets on Hyperliquid.',
+    description: 'Get current mid prices for all perpetual markets.',
     input_schema: { type: 'object', properties: {} },
   },
   {
     name: 'get_positions',
-    description: 'Get all open perpetual positions with unrealized PnL, entry price, mark price, and leverage.',
+    description: 'Get all open perpetual positions with unrealized PnL, entry price, mark price, leverage.',
     input_schema: { type: 'object', properties: {} },
   },
   {
     name: 'get_account_value',
-    description: 'Get account equity, margin used, withdrawable balance, and liquidation risk summary. Also returns spot balances for Unified Account users.',
+    description: 'Get account equity, margin used, withdrawable balance. Returns spot+perp for Unified Account.',
     input_schema: { type: 'object', properties: {} },
   },
   {
@@ -46,22 +40,12 @@ export const TOOL_DEFINITIONS = [
   {
     name: 'get_fills',
     description: 'Get recent trade history (fills) for the account.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        days: { type: 'number', description: 'Look back N days (default 7)' },
-      },
-    },
+    input_schema: { type: 'object', properties: { days: { type: 'number' } } },
   },
   {
     name: 'get_funding_payments',
     description: 'Get recent funding payments received or paid.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        days: { type: 'number', description: 'Look back N days (default 7)' },
-      },
-    },
+    input_schema: { type: 'object', properties: { days: { type: 'number' } } },
   },
   {
     name: 'get_candles',
@@ -70,193 +54,146 @@ export const TOOL_DEFINITIONS = [
       type: 'object',
       properties: {
         coin: { type: 'string' },
-        interval: { type: 'string', enum: ['1m', '5m', '15m', '30m', '1h', '4h', '1d'] },
-        lookback: { type: 'number', description: 'Number of candles (default 100)' },
+        interval: { type: 'string', enum: ['1m','5m','15m','30m','1h','4h','1d'] },
+        lookback: { type: 'number' },
       },
       required: ['coin'],
     },
   },
   {
     name: 'compute_indicators',
-    description: 'Compute technical indicators (RSI, MACD, EMA, SMA, Bollinger Bands, ATR) from OHLCV data.',
+    description: 'Compute technical indicators (RSI, MACD, EMA, SMA, Bollinger Bands, ATR) from live OHLCV.',
     input_schema: {
       type: 'object',
       properties: {
         coin: { type: 'string' },
-        interval: { type: 'string', enum: ['1m', '5m', '15m', '30m', '1h', '4h', '1d'] },
-        indicators: {
-          type: 'array',
-          items: { type: 'string', enum: ['RSI', 'MACD', 'EMA_9', 'EMA_21', 'SMA_50', 'SMA_200', 'BB', 'ATR'] },
-        },
+        interval: { type: 'string', enum: ['1m','5m','15m','30m','1h','4h','1d'] },
+        indicators: { type: 'array', items: { type: 'string', enum: ['RSI','MACD','EMA_9','EMA_21','SMA_50','SMA_200','BB','ATR'] } },
       },
-      required: ['coin', 'indicators'],
+      required: ['coin','indicators'],
     },
   },
   {
     name: 'get_funding_rate',
-    description: 'Get current and predicted funding rate for a coin, plus open interest.',
-    input_schema: {
-      type: 'object',
-      properties: { coin: { type: 'string' } },
-      required: ['coin'],
-    },
+    description: 'Get current and predicted funding rate + open interest for a coin.',
+    input_schema: { type: 'object', properties: { coin: { type: 'string' } }, required: ['coin'] },
   },
   {
     name: 'get_orderbook',
-    description: 'Get the L2 order book (bids and asks) for a coin.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        coin: { type: 'string' },
-        levels: { type: 'number', description: 'Number of price levels (default 10)' },
-      },
-      required: ['coin'],
-    },
+    description: 'Get L2 order book (bids and asks) for a coin.',
+    input_schema: { type: 'object', properties: { coin: { type: 'string' }, levels: { type: 'number' } }, required: ['coin'] },
   },
   {
     name: 'get_market_info',
-    description: 'Get market info for a coin: max leverage, size decimals, 24h volume, open interest, mark price.',
-    input_schema: {
-      type: 'object',
-      properties: { coin: { type: 'string' } },
-      required: ['coin'],
-    },
+    description: 'Get market info: max leverage, size decimals, 24h volume, open interest.',
+    input_schema: { type: 'object', properties: { coin: { type: 'string' } }, required: ['coin'] },
   },
   {
     name: 'get_top_movers',
     description: 'Get top gaining and losing perpetual markets by 24h price change.',
-    input_schema: {
-      type: 'object',
-      properties: { n: { type: 'number', description: 'Number of top movers per side (default 10)' } },
-    },
+    input_schema: { type: 'object', properties: { n: { type: 'number' } } },
   },
   {
     name: 'search_coins',
     description: 'Search for perpetual markets on Hyperliquid by name or symbol.',
-    input_schema: {
-      type: 'object',
-      properties: { query: { type: 'string' } },
-      required: ['query'],
-    },
+    input_schema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] },
   },
   {
     name: 'get_vault_details',
     description: 'Get details about a Hyperliquid vault (TVL, leader, performance).',
-    input_schema: {
-      type: 'object',
-      properties: { vault_address: { type: 'string', description: '0x vault address' } },
-      required: ['vault_address'],
-    },
+    input_schema: { type: 'object', properties: { vault_address: { type: 'string' } }, required: ['vault_address'] },
   },
   {
     name: 'place_order',
-    description: 'Queue a trade for approval. The trade will not execute until approved via the approval gate. Specify MARKET or LIMIT, side (BUY/SELL), coin, and size in coin units.',
+    description: 'Queue a trade for approval. Not executed until user approves.',
     input_schema: {
       type: 'object',
       properties: {
         coin: { type: 'string' },
-        side: { type: 'string', enum: ['BUY', 'SELL'] },
-        size: { type: 'number', description: 'Position size in coin units (e.g. 0.1 for 0.1 BTC)' },
-        order_type: { type: 'string', enum: ['MARKET', 'LIMIT'], default: 'MARKET' },
-        price: { type: 'number', description: 'Required for LIMIT orders' },
+        side: { type: 'string', enum: ['BUY','SELL'] },
+        size: { type: 'number', description: 'Size in coin units' },
+        order_type: { type: 'string', enum: ['MARKET','LIMIT'], default: 'MARKET' },
+        price: { type: 'number' },
         reduce_only: { type: 'boolean', default: false },
-        reasoning: { type: 'string', description: 'Full reasoning for this trade — signals, thesis, risk/reward' },
-        playbook_id: { type: 'string', description: 'Optional playbook this trade belongs to' },
-      },
-      required: ['coin', 'side', 'size', 'reasoning'],
-    },
-  },
-  {
-    name: 'cancel_order',
-    description: 'Cancel a pending open order by order ID. Requires approval.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        coin: { type: 'string' },
-        order_id: { type: 'number' },
         reasoning: { type: 'string' },
+        playbook_id: { type: 'string' },
       },
-      required: ['coin', 'order_id', 'reasoning'],
-    },
-  },
-  {
-    name: 'set_leverage',
-    description: 'Set leverage for a coin. Requires approval.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        coin: { type: 'string' },
-        leverage: { type: 'number', minimum: 1, maximum: 50 },
-        cross: { type: 'boolean', default: true },
-        reasoning: { type: 'string' },
-      },
-      required: ['coin', 'leverage', 'reasoning'],
+      required: ['coin','side','size','reasoning'],
     },
   },
   {
     name: 'place_exit_orders',
-    description: 'Place native stop-loss and take-profit orders directly on Hyperliquid. These appear in the Hyperliquid UI and execute even if HyperVibe is offline. ALWAYS call this after a position is opened. Requires approval.',
+    description: 'Place native TP limit orders on Hyperliquid + SL as HyperVibe trigger. ALWAYS call after opening a position. Hyperliquid minimum order = $11. TPs below $11 are automatically merged.',
     input_schema: {
       type: 'object',
       properties: {
         coin: { type: 'string' },
-        position_side: { type: 'string', enum: ['LONG', 'SHORT'], description: 'The side of the OPEN position' },
-        total_size: { type: 'number', description: 'Total position size in coin units' },
-        stop_loss_price: { type: 'number', description: 'Stop loss trigger price' },
-        tp1_price: { type: 'number', description: 'Take profit 1 trigger price' },
-        tp1_size: { type: 'number', description: 'Size to close at TP1 (coin units)' },
-        tp2_price: { type: 'number', description: 'Take profit 2 trigger price (optional)' },
-        tp2_size: { type: 'number', description: 'Size to close at TP2 (coin units, optional)' },
-        tp3_price: { type: 'number', description: 'Take profit 3 trigger price (optional)' },
-        tp3_size: { type: 'number', description: 'Size to close at TP3 (coin units, optional)' },
-        reasoning: { type: 'string', description: 'Why these exit levels were chosen' },
+        position_side: { type: 'string', enum: ['LONG','SHORT'] },
+        total_size: { type: 'number' },
+        stop_loss_price: { type: 'number' },
+        tp1_price: { type: 'number' },
+        tp1_size: { type: 'number' },
+        tp2_price: { type: 'number' },
+        tp2_size: { type: 'number' },
+        tp3_price: { type: 'number' },
+        tp3_size: { type: 'number' },
+        reasoning: { type: 'string' },
       },
-      required: ['coin', 'position_side', 'total_size', 'stop_loss_price', 'tp1_price', 'tp1_size', 'reasoning'],
+      required: ['coin','position_side','total_size','stop_loss_price','tp1_price','tp1_size','reasoning'],
+    },
+  },
+  {
+    name: 'cancel_order',
+    description: 'Cancel a pending open order by order ID.',
+    input_schema: {
+      type: 'object',
+      properties: { coin: { type: 'string' }, order_id: { type: 'number' }, reasoning: { type: 'string' } },
+      required: ['coin','order_id','reasoning'],
+    },
+  },
+  {
+    name: 'set_leverage',
+    description: 'Set leverage for a coin.',
+    input_schema: {
+      type: 'object',
+      properties: { coin: { type: 'string' }, leverage: { type: 'number', minimum: 1, maximum: 50 }, cross: { type: 'boolean', default: true }, reasoning: { type: 'string' } },
+      required: ['coin','leverage','reasoning'],
     },
   },
   {
     name: 'create_trigger',
-    description: 'Create a new trigger — a condition and action pair evaluated by Heartbeat every 30s.',
+    description: 'Create a Heartbeat trigger — condition + action evaluated every 30s.',
     input_schema: {
       type: 'object',
       properties: {
         name: { type: 'string' },
         playbook_id: { type: 'string' },
         watch_coins: { type: 'array', items: { type: 'string' } },
-        condition_mode: { type: 'string', enum: ['code', 'time', 'llm'] },
+        condition_mode: { type: 'string', enum: ['code','time','llm'] },
         condition_expr: { type: 'string' },
-        action_type: { type: 'string', enum: ['hard_order', 'reasoning_job'] },
+        action_type: { type: 'string', enum: ['hard_order','reasoning_job'] },
         action_args: { type: 'object' },
         context: { type: 'string' },
         expires_at: { type: 'number' },
       },
-      required: ['name', 'condition_mode', 'condition_expr', 'action_type'],
+      required: ['name','condition_mode','condition_expr','action_type'],
     },
   },
   {
     name: 'create_playbook',
-    description: 'Create a new trading playbook — a persistent strategy document that anchors every decision.',
+    description: 'Create a new trading playbook.',
     input_schema: {
       type: 'object',
-      properties: {
-        name: { type: 'string' },
-        description: { type: 'string' },
-        allocation: { type: 'number' },
-        plan: { type: 'string' },
-      },
-      required: ['name', 'plan'],
+      properties: { name: { type: 'string' }, description: { type: 'string' }, allocation: { type: 'number' }, plan: { type: 'string' } },
+      required: ['name','plan'],
     },
   },
   {
     name: 'add_observation',
-    description: 'Log an observation, insight, or lesson to the trade journal.',
+    description: 'Log an observation to the trade journal.',
     input_schema: {
       type: 'object',
-      properties: {
-        content: { type: 'string' },
-        playbook_id: { type: 'string' },
-        tags: { type: 'array', items: { type: 'string' } },
-      },
+      properties: { content: { type: 'string' }, playbook_id: { type: 'string' }, tags: { type: 'array', items: { type: 'string' } } },
       required: ['content'],
     },
   },
@@ -266,118 +203,71 @@ export const TOOL_DEFINITIONS = [
 
 export async function handleTool(name, input, { api, signer, walletAddress, vaultAddress, playbookContext }) {
   switch (name) {
-    case 'get_price':
-      return api.getPrices(input.coins);
-    case 'get_all_mids':
-      return api.getAllMids();
-    case 'get_positions':
-      return api.getPositions(walletAddress);
-    case 'get_account_value':
-      return api.getAccountValue(walletAddress);
-    case 'get_open_orders':
-      return api.getOpenOrders(walletAddress);
-    case 'get_fills': {
-      const days = input.days ?? 7;
-      return api.getFills(walletAddress, Date.now() - days * 86_400_000);
-    }
-    case 'get_funding_payments': {
-      const days = input.days ?? 7;
-      return api.getFundingPayments(walletAddress, Date.now() - days * 86_400_000);
-    }
-    case 'get_candles':
-      return api.getCandles(input.coin, input.interval ?? '1h', input.lookback ?? 100);
+    case 'get_price':           return api.getPrices(input.coins);
+    case 'get_all_mids':        return api.getAllMids();
+    case 'get_positions':       return api.getPositions(walletAddress);
+    case 'get_account_value':   return api.getAccountValue(walletAddress);
+    case 'get_open_orders':     return api.getOpenOrders(walletAddress);
+    case 'get_fills':           return api.getFills(walletAddress, Date.now() - (input.days ?? 7) * 86_400_000);
+    case 'get_funding_payments':return api.getFundingPayments(walletAddress, Date.now() - (input.days ?? 7) * 86_400_000);
+    case 'get_candles':         return api.getCandles(input.coin, input.interval ?? '1h', input.lookback ?? 100);
     case 'compute_indicators': {
       const candles = await api.getCandles(input.coin, input.interval ?? '1h', 200);
       return computeIndicators(candles, input.indicators);
     }
-    case 'get_funding_rate':
-      return api.getFundingRate(input.coin);
-    case 'get_orderbook':
-      return api.getOrderbook(input.coin, input.levels ?? 10);
-    case 'get_market_info':
-      return api.getMarketInfo(input.coin);
-    case 'get_top_movers':
-      return api.getTopMovers(input.n ?? 10);
-    case 'search_coins':
-      return api.searchCoins(input.query);
-    case 'get_vault_details':
-      return api.getVaultDetails(input.vault_address);
+    case 'get_funding_rate':    return api.getFundingRate(input.coin);
+    case 'get_orderbook':       return api.getOrderbook(input.coin, input.levels ?? 10);
+    case 'get_market_info':     return api.getMarketInfo(input.coin);
+    case 'get_top_movers':      return api.getTopMovers(input.n ?? 10);
+    case 'search_coins':        return api.searchCoins(input.query);
+    case 'get_vault_details':   return api.getVaultDetails(input.vault_address);
 
     case 'place_order': {
       const approval = Permissions.queue({
         playbookId: input.playbook_id ?? playbookContext?.id ?? null,
-        coin: input.coin,
-        side: input.side,
-        size: input.size,
+        coin: input.coin, side: input.side, size: input.size,
         orderType: input.order_type ?? 'MARKET',
-        price: input.price ?? null,
-        reduceOnly: input.reduce_only ?? false,
+        price: input.price ?? null, reduceOnly: input.reduce_only ?? false,
         reasoning: input.reasoning,
       });
-      return {
-        queued: true,
-        approval_id: approval.id,
-        message: `Trade queued for approval — ${input.side} ${input.size} ${input.coin} (${input.order_type ?? 'MARKET'}). Awaiting user approval.`,
-      };
+      return { queued: true, approval_id: approval.id, message: `Trade queued — ${input.side} ${input.size} ${input.coin}. Awaiting approval.` };
     }
-
-    case 'cancel_order': {
-      const approval = Permissions.queue({
-        playbookId: playbookContext?.id ?? null,
-        coin: input.coin,
-        side: 'CANCEL',
-        size: String(input.order_id),
-        orderType: 'CANCEL',
-        reasoning: input.reasoning,
-      });
-      return { queued: true, approval_id: approval.id, message: 'Cancel request queued for approval.' };
-    }
-
-    case 'set_leverage': {
-      const approval = Permissions.queue({
-        coin: input.coin,
-        side: 'SET_LEVERAGE',
-        size: String(input.leverage),
-        orderType: 'SET_LEVERAGE',
-        reasoning: input.reasoning,
-      });
-      return { queued: true, approval_id: approval.id, message: `Leverage change to ${input.leverage}x queued for approval.` };
-    }
-
 
     case 'place_exit_orders': {
       const approval = Permissions.queue({
         playbookId: playbookContext?.id ?? null,
-        coin: input.coin,
-        side: 'EXIT_ORDERS',
-        size: String(input.total_size),
+        coin: input.coin, side: 'EXIT_ORDERS', size: String(input.total_size),
         orderType: 'EXIT_ORDERS',
-        reasoning: `Exit orders for ${input.position_side} ${input.total_size} ${input.coin}\n` +
-          `SL: $${input.stop_loss_price}\n` +
-          `TP1: $${input.tp1_price} (${input.tp1_size})\n` +
-          (input.tp2_price ? `TP2: $${input.tp2_price} (${input.tp2_size})\n` : '') +
-          (input.tp3_price ? `TP3: $${input.tp3_price} (${input.tp3_size})\n` : '') +
-          `\n${input.reasoning}`,
-        // Store full params in price field as JSON for execution
+        reasoning:
+          `Exit orders for ${input.position_side} ${input.total_size} ${input.coin}\n` +
+          `SL: $${input.stop_loss_price} | TP1: $${input.tp1_price} (${input.tp1_size})` +
+          (input.tp2_price ? ` | TP2: $${input.tp2_price} (${input.tp2_size})` : '') +
+          (input.tp3_price ? ` | TP3: $${input.tp3_price} (${input.tp3_size})` : '') +
+          `\n\n${input.reasoning}`,
         price: JSON.stringify(input),
       });
       return {
-        queued: true,
-        approval_id: approval.id,
-        message: `Exit orders queued for approval — SL $${input.stop_loss_price}, TP1 $${input.tp1_price}${input.tp2_price ? `, TP2 $${input.tp2_price}` : ''}${input.tp3_price ? `, TP3 $${input.tp3_price}` : ''}. These will appear on Hyperliquid once approved.`,
+        queued: true, approval_id: approval.id,
+        message: `Exit orders queued — SL $${input.stop_loss_price}, TP1 $${input.tp1_price}${input.tp2_price ? `, TP2 $${input.tp2_price}` : ''}. TPs below $11 will be merged automatically.`,
       };
+    }
+
+    case 'cancel_order': {
+      const approval = Permissions.queue({ coin: input.coin, side: 'CANCEL', size: String(input.order_id), orderType: 'CANCEL', reasoning: input.reasoning });
+      return { queued: true, approval_id: approval.id };
+    }
+
+    case 'set_leverage': {
+      const approval = Permissions.queue({ coin: input.coin, side: 'SET_LEVERAGE', size: String(input.leverage), orderType: 'SET_LEVERAGE', reasoning: input.reasoning });
+      return { queued: true, approval_id: approval.id };
     }
 
     case 'create_trigger': {
       const trigger = Triggers.create({
-        name: input.name,
-        playbookId: input.playbook_id ?? null,
-        watchCoins: input.watch_coins ?? [],
-        conditionMode: input.condition_mode,
-        conditionExpr: input.condition_expr,
-        actionType: input.action_type,
-        actionArgs: input.action_args ?? {},
-        context: input.context ?? '',
+        name: input.name, playbookId: input.playbook_id ?? null,
+        watchCoins: input.watch_coins ?? [], conditionMode: input.condition_mode,
+        conditionExpr: input.condition_expr, actionType: input.action_type,
+        actionArgs: input.action_args ?? {}, context: input.context ?? '',
         expiresAt: input.expires_at ?? null,
       });
       if (trigger.conditionMode === 'time') scheduleCronTrigger(trigger, () => {});
@@ -385,21 +275,12 @@ export async function handleTool(name, input, { api, signer, walletAddress, vaul
     }
 
     case 'create_playbook': {
-      const pb = Playbooks.create({
-        name: input.name,
-        description: input.description ?? '',
-        allocation: input.allocation ?? 0,
-        plan: input.plan,
-      });
+      const pb = Playbooks.create({ name: input.name, description: input.description ?? '', allocation: input.allocation ?? 0, plan: input.plan });
       return { created: true, playbook: pb };
     }
 
     case 'add_observation': {
-      const id = Learnings.addObservation({
-        playbookId: input.playbook_id ?? null,
-        content: input.content,
-        tags: input.tags ?? [],
-      });
+      const id = Learnings.addObservation({ playbookId: input.playbook_id ?? null, content: input.content, tags: input.tags ?? [] });
       return { logged: true, id };
     }
 
@@ -408,181 +289,183 @@ export async function handleTool(name, input, { api, signer, walletAddress, vaul
   }
 }
 
-// ── Execute an approved trade ──────────────────────────────────────────────────
+// ── Execute approved order ─────────────────────────────────────────────────────
 
 export async function executeApprovedOrder(approval, { api, signer, vaultAddress }) {
-  if (!signer) {
-    throw new Error('No signer configured. Go to Settings and add your HL_PRIVATE_KEY.');
-  }
+  if (!signer) throw new Error('No signer — add HL_PRIVATE_KEY in Settings');
 
-  let payload;
-
-
-  // ── Native exit orders (SL + TP) ─────────────────────────────────────────
+  // ── Exit orders (TP as limit orders + SL as HyperVibe trigger) ─────────────
   if (approval.order_type === 'EXIT_ORDERS') {
-    let params;
-    try {
-      params = JSON.parse(approval.price);
-    } catch {
-      throw new Error('Invalid exit order params in approval');
-    }
-
-    const {
-      coin, position_side, total_size,
-      stop_loss_price, tp1_price, tp1_size,
-      tp2_price, tp2_size, tp3_price, tp3_size,
-    } = params;
+    const params = JSON.parse(approval.price);
+    const { coin, position_side, total_size, stop_loss_price, tp1_price, tp1_size, tp2_price, tp2_size, tp3_price, tp3_size } = params;
 
     const assetIndex = await api.getAssetIndex(coin);
-    const asset = await api.getAssetInfo(coin);
-    const isLong = position_side === 'LONG';
+    const asset      = await api.getAssetInfo(coin);
+    const isLong     = position_side === 'LONG';
+    const exitIsBuy  = !isLong;
+    const fmt        = (sz) => HyperliquidSigner.formatSize(parseFloat(sz), asset.szDecimals);
+    // Normalize price: strip trailing zeros to match Hyperliquid's Python normalization
+    // e.g. "40.480" → "40.48", "41.730" → "41.73"
+    const px5        = (p) => {
+      const s = parseFloat(p).toPrecision(5);
+      return s.includes('.') ? s.replace(/\.?0+$/, '') : s;
+    };
 
-    // For a LONG: SL is a sell trigger, TPs are sell triggers
-    // For a SHORT: SL is a buy trigger, TPs are buy triggers
-    const exitIsBuy = !isLong;
+    console.log(`[exit] ${position_side} ${total_size} ${coin} | SL:$${stop_loss_price} TP1:$${tp1_price}`);
 
-    const fmt = (sz) => HyperliquidSigner.formatSize(parseFloat(sz), asset.szDecimals);
-    const px = (price) => parseFloat(price).toPrecision(5);
+    const results = [];
+    const errors  = [];
 
-    const orders = [
-      // Stop Loss — market order when triggered
-      {
-        isBuy: exitIsBuy,
-        triggerPx: px(stop_loss_price),
-        size: fmt(total_size),
-        isMarket: true,
-        tpsl: 'sl',
-      },
-      // TP1
-      {
-        isBuy: exitIsBuy,
-        triggerPx: px(tp1_price),
-        size: fmt(tp1_size),
-        isMarket: false,
-        limitPx: px(isLong ? tp1_price * 0.999 : tp1_price * 1.001), // slight slippage
-        tpsl: 'tp',
-      },
-    ];
-
-    // TP2 optional
-    if (tp2_price && tp2_size) {
-      orders.push({
-        isBuy: exitIsBuy,
-        triggerPx: px(tp2_price),
-        size: fmt(tp2_size),
-        isMarket: false,
-        limitPx: px(isLong ? tp2_price * 0.999 : tp2_price * 1.001),
-        tpsl: 'tp',
+    // Helper: place a single limit order using the same path as entry orders
+    const submitLimit = async (price, size, label) => {
+      await new Promise(r => setTimeout(r, 80));
+      const payload = await signer.buildOrderAction({
+        assetIndex,
+        isBuy:       exitIsBuy,
+        price:       px5(price),
+        size:        fmt(size),
+        reduceOnly:  true,
+        tif:         'Gtc',
+        vaultAddress: vaultAddress ?? null,
       });
+      const res = await api.submitAction(payload.action, payload.nonce, payload.signature, payload.vaultAddress);
+      console.log(`[exit] ${label} response:`, JSON.stringify(res));
+      if (res?.status === 'err') throw new Error(String(res.response));
+      const statusErr = res?.response?.data?.statuses?.[0]?.error;
+      if (statusErr) throw new Error(statusErr);
+      return res;
+    };
+
+    // Consolidate TPs — Hyperliquid minimum $11 per order
+    const MIN_NOTIONAL = 11.5;
+    const tpCandidates = [
+      tp1_price && tp1_size ? { price: parseFloat(tp1_price), size: parseFloat(tp1_size), label: 'TP1' } : null,
+      tp2_price && tp2_size ? { price: parseFloat(tp2_price), size: parseFloat(tp2_size), label: 'TP2' } : null,
+      tp3_price && tp3_size ? { price: parseFloat(tp3_price), size: parseFloat(tp3_size), label: 'TP3' } : null,
+    ].filter(Boolean);
+
+    const tpOrders = [];
+    let acc = null;
+    for (const tp of tpCandidates) {
+      if (!acc) {
+        acc = { price: tp.price, size: tp.size, label: tp.label };
+      } else {
+        acc.size  += tp.size;
+        acc.label += '+' + tp.label;
+      }
+      if (acc.size * acc.price >= MIN_NOTIONAL) {
+        tpOrders.push({ ...acc });
+        acc = null;
+      }
+    }
+    if (acc) {
+      if (tpOrders.length > 0) {
+        tpOrders[tpOrders.length - 1].size += acc.size;
+        tpOrders[tpOrders.length - 1].label += '+' + acc.label;
+      } else {
+        tpOrders.push(acc);
+      }
     }
 
-    // TP3 optional
-    if (tp3_price && tp3_size) {
-      orders.push({
-        isBuy: exitIsBuy,
-        triggerPx: px(tp3_price),
-        size: fmt(tp3_size),
-        isMarket: false,
-        limitPx: px(isLong ? tp3_price * 0.999 : tp3_price * 1.001),
-        tpsl: 'tp',
+    console.log(`[exit] TPs: ${tpCandidates.map(t => t.label + '@' + t.price).join(', ')}`);
+    console.log(`[exit] After merge: ${tpOrders.map(t => t.label + '×' + t.size.toFixed(2) + '@$' + t.price).join(', ')}`);
+
+    for (const tp of tpOrders) {
+      try {
+        const r   = await submitLimit(tp.price, tp.size, tp.label);
+        const oid = r?.response?.data?.statuses?.[0]?.resting?.oid;
+        results.push({ type: tp.label, price: tp.price, oid });
+        console.log(`[exit] ${tp.label} placed oid=${oid} notional=$${(tp.size * tp.price).toFixed(2)}`);
+      } catch(e) {
+        errors.push(`${tp.label}: ${e.message}`);
+        console.error(`[exit] ${tp.label} failed:`, e.message);
+      }
+    }
+
+    // SL as HyperVibe Heartbeat trigger (30s monitoring → market order)
+    try {
+      const slExpr = isLong
+        ? `prices["${coin}"] <= ${stop_loss_price}`
+        : `prices["${coin}"] >= ${stop_loss_price}`;
+
+      Triggers.create({
+        name: `SL ${coin} @ $${stop_loss_price}`,
+        watchCoins: [coin], conditionMode: 'code', conditionExpr: slExpr,
+        actionType: 'hard_order',
+        actionArgs: { coin, side: exitIsBuy ? 'BUY' : 'SELL', size: fmt(total_size), order_type: 'MARKET', reduce_only: true },
+        context: `Auto SL: ${position_side} ${total_size} ${coin}. Market order when price hits $${stop_loss_price}.`,
+        expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
       });
+      results.push({ type: 'SL', price: stop_loss_price, mode: 'HyperVibe 30s' });
+      console.log(`[exit] SL trigger: ${slExpr}`);
+    } catch(e) {
+      errors.push(`SL: ${e.message}`);
+      console.error('[exit] SL trigger failed:', e.message);
     }
 
-    console.log(`[execute] Placing ${orders.length} exit orders for ${position_side} ${total_size} ${coin}`);
-    console.log(`[execute] SL: $${stop_loss_price}, TP1: $${tp1_price}${tp2_price ? `, TP2: $${tp2_price}` : ''}${tp3_price ? `, TP3: $${tp3_price}` : ''}`);
+    console.log(`[exit] done — placed: [${results.map(r => r.type).join(', ')}] errors: [${errors.join('; ')}]`);
 
-    const payload = await signer.buildExitBatchAction(assetIndex, orders, vaultAddress);
-    const result = await api.submitAction(payload.action, payload.nonce, payload.signature, payload.vaultAddress);
+    if (results.length === 0) throw new Error(`All exit orders failed:\n${errors.join('\n')}`);
 
-    console.log('[execute] Exit orders response:', JSON.stringify(result));
-
-    if (result?.status === 'err') {
-      throw new Error(`Hyperliquid rejected exit orders: ${JSON.stringify(result.response)}`);
-    }
-
-    // Check individual statuses
-    const statuses = result?.response?.data?.statuses ?? [];
-    const errors = statuses.filter(s => s.error).map(s => s.error);
-    if (errors.length > 0) {
-      throw new Error(`Some exit orders failed: ${errors.join(', ')}`);
-    }
-
-    const filled = statuses.filter(s => s.resting || s.filled).length;
-    console.log(`[execute] ${filled}/${orders.length} exit orders placed successfully`);
-    return result;
+    return {
+      status: errors.length === 0 ? 'ok' : 'partial',
+      placed: results, errors,
+      response: { data: { statuses: [{ resting: { oid: results[0]?.oid, note: results.map(r => r.type + '@$' + r.price).join(', ') } }] } },
+    };
   }
 
+  // ── Cancel ─────────────────────────────────────────────────────────────────
   if (approval.order_type === 'CANCEL') {
     const oid = parseInt(approval.size);
     const assetIndex = await api.getAssetIndex(approval.coin);
-    payload = await signer.buildCancelAction([{ assetIndex, oid }], vaultAddress);
-  } else if (approval.order_type === 'SET_LEVERAGE') {
+    const payload = await signer.buildCancelAction([{ assetIndex, oid }], vaultAddress);
+    return api.submitAction(payload.action, payload.nonce, payload.signature, payload.vaultAddress);
+  }
+
+  // ── Set leverage ────────────────────────────────────────────────────────────
+  if (approval.order_type === 'SET_LEVERAGE') {
     const leverage = parseInt(approval.size);
     const assetIndex = await api.getAssetIndex(approval.coin);
-    payload = await signer.buildSetLeverageAction(assetIndex, leverage, true, vaultAddress);
+    const payload = await signer.buildSetLeverageAction(assetIndex, leverage, true, vaultAddress);
+    return api.submitAction(payload.action, payload.nonce, payload.signature, payload.vaultAddress);
+  }
+
+  // ── Regular order ───────────────────────────────────────────────────────────
+  const assetIndex = await api.getAssetIndex(approval.coin);
+  const asset      = await api.getAssetInfo(approval.coin);
+  const isBuy      = approval.side === 'BUY';
+  const isMarket   = approval.order_type === 'MARKET';
+
+  let price;
+  if (isMarket) {
+    const midPx = await api.getPrice(approval.coin);
+    price = HyperliquidSigner.marketPrice(midPx, isBuy);
   } else {
-    // Regular order
-    const assetIndex = await api.getAssetIndex(approval.coin);
-    const asset      = await api.getAssetInfo(approval.coin);
-    const isBuy      = approval.side === 'BUY';
-    const isMarket   = approval.order_type === 'MARKET';
-
-    let price;
-    if (isMarket) {
-      const midPx = await api.getPrice(approval.coin);
-      price = HyperliquidSigner.marketPrice(midPx, isBuy);
-    } else {
-      price = parseFloat(approval.price).toPrecision(5);
-    }
-
-    const size = HyperliquidSigner.formatSize(parseFloat(approval.size), asset.szDecimals);
-
-    console.log(`[execute] ${approval.side} ${size} ${approval.coin} @ ${price} (${approval.order_type}) assetIdx=${assetIndex}`);
-
-    payload = await signer.buildOrderAction({
-      assetIndex,
-      isBuy,
-      price,
-      size,
-      reduceOnly: Boolean(approval.reduce_only),
-      tif: isMarket ? 'Ioc' : 'Gtc',
-      vaultAddress,
-    });
+    price = parseFloat(approval.price).toPrecision(5);
   }
 
-  const result = await api.submitAction(
-    payload.action,
-    payload.nonce,
-    payload.signature,
-    payload.vaultAddress
-  );
+  const size = HyperliquidSigner.formatSize(parseFloat(approval.size), asset.szDecimals);
+  console.log(`[execute] ${approval.side} ${size} ${approval.coin} @ ${price} (${approval.order_type})`);
 
-  console.log('[execute] Hyperliquid response:', JSON.stringify(result));
+  const payload = await signer.buildOrderAction({
+    assetIndex, isBuy, price, size,
+    reduceOnly: Boolean(approval.reduce_only),
+    tif: isMarket ? 'Ioc' : 'Gtc',
+    vaultAddress,
+  });
 
-  // ── Check for Hyperliquid-level errors ─────────────────────────────────────
-  if (result?.status === 'err') {
-    throw new Error(`Hyperliquid rejected order: ${JSON.stringify(result.response)}`);
-  }
+  const result = await api.submitAction(payload.action, payload.nonce, payload.signature, payload.vaultAddress);
+  console.log('[execute] response:', JSON.stringify(result));
 
-  // Check for per-order status errors
+  if (result?.status === 'err') throw new Error(`Hyperliquid rejected order: ${JSON.stringify(result.response)}`);
   const statuses = result?.response?.data?.statuses ?? [];
   for (const s of statuses) {
-    if (s.error) {
-      throw new Error(`Order error: ${s.error}`);
-    }
-    if (s.resting) {
-      // Limit order resting in book — not an error
-      console.log(`[execute] Order resting: oid=${s.resting.oid}`);
-    }
-    if (s.filled) {
-      console.log(`[execute] Order filled: ${s.filled.totalSz} @ ${s.filled.avgPx}, fee=${s.filled.fee}`);
-    }
+    if (s.error) throw new Error(`Order error: ${s.error}`);
   }
-
   return result;
 }
 
-// ── Diagnostic: test signer without executing ──────────────────────────────────
+// ── Signer test ────────────────────────────────────────────────────────────────
 
 export async function testSigner(signer, api, coin = 'BTC') {
   if (!signer) return { ok: false, error: 'No signer configured' };
@@ -590,26 +473,8 @@ export async function testSigner(signer, api, coin = 'BTC') {
     const assetIndex = await api.getAssetIndex(coin);
     const midPx = await api.getPrice(coin);
     const price = HyperliquidSigner.marketPrice(midPx, true);
-    const payload = await signer.buildOrderAction({
-      assetIndex,
-      isBuy: true,
-      price,
-      size: '0.001',
-      reduceOnly: false,
-      tif: 'Ioc',
-      vaultAddress: null,
-    });
-    return {
-      ok: true,
-      signerAddress: signer.address,
-      testCoin: coin,
-      assetIndex,
-      signedPayload: {
-        action: payload.action,
-        nonce: payload.nonce,
-        signatureR: payload.signature.r.slice(0, 12) + '…',
-      },
-    };
+    const payload = await signer.buildOrderAction({ assetIndex, isBuy: true, price, size: '0.001', reduceOnly: false, tif: 'Ioc', vaultAddress: null });
+    return { ok: true, signerAddress: signer.address, testCoin: coin, assetIndex, signatureR: payload.signature.r.slice(0, 12) + '…' };
   } catch (err) {
     return { ok: false, error: err.message };
   }
@@ -622,24 +487,23 @@ function computeIndicators(candles, indicators) {
   const closes = candles.map(c => c.c);
   const highs  = candles.map(c => c.h);
   const lows   = candles.map(c => c.l);
-  const result = { candles: candles.length };
+  const result = { candles: candles.length, currentPrice: closes.at(-1) };
 
   for (const ind of indicators) {
     switch (ind) {
-      case 'RSI':   result.RSI   = computeRSI(closes, 14); break;
-      case 'MACD':  result.MACD  = computeMACD(closes); break;
-      case 'EMA_9': result.EMA_9 = ema(closes, 9).at(-1); break;
-      case 'EMA_21':result.EMA_21= ema(closes, 21).at(-1); break;
+      case 'RSI':    result.RSI    = computeRSI(closes, 14); break;
+      case 'MACD':   result.MACD   = computeMACD(closes); break;
+      case 'EMA_9':  result.EMA_9  = ema(closes, 9).at(-1); break;
+      case 'EMA_21': result.EMA_21 = ema(closes, 21).at(-1); break;
       case 'SMA_50': result.SMA_50 = sma(closes, 50); break;
       case 'SMA_200':result.SMA_200= sma(closes, 200); break;
-      case 'BB':    result.BB    = bollingerBands(closes, 20, 2); break;
-      case 'ATR':   result.ATR   = computeATR(highs, lows, closes, 14); break;
+      case 'BB':     result.BB     = bollingerBands(closes, 20, 2); break;
+      case 'ATR':    result.ATR    = computeATR(highs, lows, closes, 14); break;
     }
   }
-  result.currentPrice  = closes.at(-1);
-  result.priceChange24h = closes.length >= 25
-    ? ((closes.at(-1) - closes.at(-25)) / closes.at(-25) * 100).toFixed(2) + '%'
-    : 'N/A';
+  if (closes.length >= 25) {
+    result.priceChange24h = ((closes.at(-1) - closes.at(-25)) / closes.at(-25) * 100).toFixed(2) + '%';
+  }
   return result;
 }
 
@@ -667,10 +531,10 @@ function computeRSI(closes, period = 14) {
 }
 
 function computeMACD(closes) {
-  const ema12  = ema(closes, 12);
-  const ema26  = ema(closes, 26);
+  const ema12    = ema(closes, 12);
+  const ema26    = ema(closes, 26);
   const macdLine = ema12.map((v, i) => v - ema26[i]);
-  const signal = ema(macdLine.slice(-26), 9);
+  const signal   = ema(macdLine.slice(-26), 9);
   return {
     macd:      parseFloat(macdLine.at(-1).toFixed(4)),
     signal:    parseFloat(signal.at(-1).toFixed(4)),
@@ -684,9 +548,9 @@ function bollingerBands(closes, period = 20, mult = 2) {
   const mean  = slice.reduce((a, b) => a + b, 0) / period;
   const std   = Math.sqrt(slice.reduce((a, b) => a + (b - mean) ** 2, 0) / period);
   return {
-    upper:     parseFloat((mean + mult * std).toFixed(4)),
-    middle:    parseFloat(mean.toFixed(4)),
-    lower:     parseFloat((mean - mult * std).toFixed(4)),
+    upper: parseFloat((mean + mult * std).toFixed(4)),
+    middle: parseFloat(mean.toFixed(4)),
+    lower: parseFloat((mean - mult * std).toFixed(4)),
     bandwidth: parseFloat((4 * std / mean * 100).toFixed(2)),
   };
 }
@@ -694,11 +558,7 @@ function bollingerBands(closes, period = 20, mult = 2) {
 function computeATR(highs, lows, closes, period = 14) {
   const trs = [];
   for (let i = 1; i < highs.length; i++) {
-    trs.push(Math.max(
-      highs[i] - lows[i],
-      Math.abs(highs[i] - closes[i - 1]),
-      Math.abs(lows[i]  - closes[i - 1])
-    ));
+    trs.push(Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1])));
   }
   return parseFloat(sma(trs, period)?.toFixed(4) ?? 0);
 }

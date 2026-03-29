@@ -627,10 +627,83 @@
   .text-dim { color: var(--text2); }
   .text-muted { color: var(--text3); }
 
-  /* Scrollable left sidebar sections */
-  .sidebar-scroll { flex: 1; overflow-y: auto; }
-  .sidebar-scroll::-webkit-scrollbar { width: 3px; }
-  .sidebar-scroll::-webkit-scrollbar-thumb { background: var(--border2); }
+
+  /* ── Collapsible sidebar ─────────────────────────────────────────────────── */
+  .sidebar-left {
+    transition: width 0.2s ease;
+    position: relative;
+  }
+  .sidebar-left.collapsed {
+    width: 40px !important;
+    overflow: hidden;
+  }
+  .sidebar-left.collapsed .sidebar-section,
+  .sidebar-left.collapsed .sidebar-label span,
+  .sidebar-left.collapsed .sidebar-label .mini-btn,
+  .sidebar-left.collapsed #playbooks-list,
+  .sidebar-left.collapsed #skills-list,
+  .sidebar-left.collapsed #triggers-list {
+    display: none;
+  }
+  .sidebar-collapse-btn {
+    position: absolute;
+    top: 8px;
+    right: 6px;
+    width: 24px; height: 24px;
+    border-radius: 5px;
+    border: 1px solid var(--border2);
+    background: var(--bg3);
+    color: var(--text3);
+    font-size: 12px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+    z-index: 10;
+    flex-shrink: 0;
+  }
+  .sidebar-collapse-btn:hover { color: var(--cyan); border-color: var(--cyan); background: var(--cyan-dim); }
+  .sidebar-left.collapsed .sidebar-collapse-btn { right: 8px; top: 8px; }
+
+  /* Collapsible sections */
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+    padding: 0;
+  }
+  .section-header:hover .section-toggle { color: var(--text2); }
+  .section-toggle {
+    color: var(--text3);
+    font-size: 10px;
+    transition: transform 0.15s;
+    margin-left: 4px;
+    flex-shrink: 0;
+  }
+  .section-toggle.open { transform: rotate(0deg); }
+  .section-toggle.closed { transform: rotate(-90deg); }
+  .section-body {
+    overflow: hidden;
+    transition: max-height 0.2s ease, opacity 0.15s;
+    max-height: 600px;
+    opacity: 1;
+  }
+  .section-body.collapsed {
+    max-height: 0;
+    opacity: 0;
+  }
+  /* Each section scrollable */
+  .sidebar-section {
+    flex-shrink: 0;
+  }
+  .section-body {
+    overflow-y: auto;
+    max-height: 180px;
+  }
+  .section-body::-webkit-scrollbar { width: 3px; }
+  .section-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
 
 
   /* ── Skill Store ─────────────────────────────────────────────────────────── */
@@ -789,32 +862,52 @@
 </header>
 
 <!-- Left sidebar -->
-<aside class="sidebar-left">
+<aside class="sidebar-left" id="sidebar-left">
+  <button class="sidebar-collapse-btn" id="sidebar-collapse-btn" onclick="toggleSidebar()" title="Collapse sidebar">‹</button>
+
   <div class="sidebar-section">
-    <div class="sidebar-label">
-      Playbooks
-      <button class="mini-btn" onclick="openCreatePlaybook()" title="New playbook">+</button>
+    <div class="section-header sidebar-label" onclick="toggleSection('playbooks')">
+      <span>Playbooks</span>
+      <div style="display:flex;gap:3px;align-items:center;">
+        <button class="mini-btn" onclick="event.stopPropagation();refreshPlaybooks()" title="Refresh">↻</button>
+        <button class="mini-btn" onclick="event.stopPropagation();openCreatePlaybook()" title="New">+</button>
+        <span class="section-toggle open" id="toggle-playbooks">▾</span>
+      </div>
     </div>
-    <div id="playbooks-list">
-      <div class="empty-state"><div class="empty-text">No playbooks yet.<br>Ask the agent to create one.</div></div>
+    <div class="section-body" id="body-playbooks">
+      <div id="playbooks-list">
+        <div class="empty-state"><div class="empty-text">No playbooks yet.</div></div>
+      </div>
     </div>
   </div>
+
   <div class="sidebar-section">
-    <div class="sidebar-label">
-      Skills
-      <button class="mini-btn" onclick="openCreateSkill()" title="New skill">+</button>
+    <div class="section-header sidebar-label" onclick="toggleSection('skills')">
+      <span>Skills</span>
+      <div style="display:flex;gap:3px;align-items:center;">
+        <button class="mini-btn" onclick="event.stopPropagation();openCreateSkill()" title="New">+</button>
+        <span class="section-toggle open" id="toggle-skills">▾</span>
+      </div>
     </div>
-    <div id="skills-list">
-      <div class="empty-state"><div class="empty-text">No skills yet.</div></div>
+    <div class="section-body" id="body-skills">
+      <div id="skills-list">
+        <div class="empty-state"><div class="empty-text">No skills yet.</div></div>
+      </div>
     </div>
   </div>
-  <div class="sidebar-section sidebar-scroll">
-    <div class="sidebar-label">
-      Triggers
-      <button class="mini-btn" onclick="openCreateTrigger()" title="New trigger">+</button>
+
+  <div class="sidebar-section">
+    <div class="section-header sidebar-label" onclick="toggleSection('triggers')">
+      <span>Triggers</span>
+      <div style="display:flex;gap:3px;align-items:center;">
+        <button class="mini-btn" onclick="event.stopPropagation();openCreateTrigger()" title="New">+</button>
+        <span class="section-toggle open" id="toggle-triggers">▾</span>
+      </div>
     </div>
-    <div id="triggers-list">
-      <div class="empty-state"><div class="empty-text">No active triggers.</div></div>
+    <div class="section-body" id="body-triggers">
+      <div id="triggers-list">
+        <div class="empty-state"><div class="empty-text">No active triggers.</div></div>
+      </div>
     </div>
   </div>
 </aside>
@@ -1431,33 +1524,55 @@ function escHtml(str) {
 
 // ── Playbooks ─────────────────────────────────────────────────────────────────
 
+async function loadPlaybooks() {
+  try {
+    const res = await fetch('/api/playbooks');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    playbooks = Array.isArray(data) ? data : [];
+    renderPlaybooks();
+  } catch(e) {
+    console.error('[playbooks] load error:', e.message);
+  }
+}
+
 function renderPlaybooks() {
   const el = document.getElementById('playbooks-list');
   const sel = document.getElementById('playbook-select');
+  if (!el || !sel) return;
 
-  // Update select
+  // active playbooks only
+  const active = playbooks.filter(pb => pb.status !== 'archived');
+
+  // Update dropdown
+  const prev = sel.value;
   sel.innerHTML = '<option value="">No playbook</option>';
-  for (const pb of playbooks) {
-    sel.innerHTML += `<option value="${pb.id}">${pb.name}</option>`;
+  for (const pb of active) {
+    const opt = document.createElement('option');
+    opt.value = pb.id;
+    opt.textContent = pb.name;
+    sel.appendChild(opt);
   }
+  if (prev) sel.value = prev;
 
-  if (playbooks.length === 0) {
-    el.innerHTML = '<div class="empty-state"><div class="empty-text">No playbooks yet.</div></div>';
+  // Update sidebar
+  if (active.length === 0) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-text">No playbooks yet.<br>Install one from Settings → Playbook Store or ask the agent to create one.</div></div>';
     return;
   }
 
-  el.innerHTML = playbooks.map(pb => `
-    <div class="pb-item" onclick="selectPlaybook('${pb.id}')">
-      <div class="pb-name">${escHtml(pb.name)}<span class="pb-state ${pb.state === 'paused' ? 'paused' : ''}">${pb.state}</span></div>
-      <div class="pb-meta">$${pb.allocation} USDC</div>
+  el.innerHTML = active.map(pb => `
+    <div class="pb-item" onclick="selectPlaybook('${escHtml(pb.id)}', this)">
+      <div class="pb-name">${escHtml(pb.name)}<span class="pb-state ${pb.state === 'paused' ? 'paused' : ''}">${escHtml(pb.state ?? 'scanning')}</span></div>
+      <div class="pb-meta">$${pb.allocation ?? 0} USDC · ${escHtml(pb.description ?? '').slice(0, 40)}${(pb.description ?? '').length > 40 ? '…' : ''}</div>
     </div>
   `).join('');
 }
 
-function selectPlaybook(id) {
+function selectPlaybook(id, el) {
   document.getElementById('playbook-select').value = id;
-  document.querySelectorAll('.pb-item').forEach(el => el.classList.remove('active'));
-  event.currentTarget.classList.add('active');
+  document.querySelectorAll('.pb-item').forEach(e => e.classList.remove('active'));
+  if (el) el.classList.add('active');
 }
 
 async function openCreatePlaybook() {
@@ -1781,6 +1896,47 @@ function formatPrice(p) {
 
 
 
+
+
+// ── Sidebar collapse & section toggle ─────────────────────────────────────────
+
+let sidebarCollapsed = false;
+const sectionState = { playbooks: true, skills: true, triggers: true };
+
+function toggleSidebar() {
+  sidebarCollapsed = !sidebarCollapsed;
+  const sidebar = document.getElementById('sidebar-left');
+  const btn     = document.getElementById('sidebar-collapse-btn');
+  sidebar.classList.toggle('collapsed', sidebarCollapsed);
+  btn.textContent = sidebarCollapsed ? '›' : '‹';
+  btn.title = sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar';
+  // Adjust grid
+  document.body.style.gridTemplateColumns = sidebarCollapsed
+    ? '40px 1fr 300px'
+    : '240px 1fr 300px';
+}
+
+function toggleSection(name) {
+  sectionState[name] = !sectionState[name];
+  const body   = document.getElementById('body-' + name);
+  const toggle = document.getElementById('toggle-' + name);
+  if (sectionState[name]) {
+    body.classList.remove('collapsed');
+    toggle.textContent = '▾';
+    toggle.classList.remove('closed');
+    toggle.classList.add('open');
+  } else {
+    body.classList.add('collapsed');
+    toggle.textContent = '›';
+    toggle.classList.add('closed');
+    toggle.classList.remove('open');
+  }
+}
+
+async function refreshPlaybooks() {
+  await loadPlaybooks();
+  notify('Playbooks refreshed', 'info');
+}
 
 // ── Skill Store ───────────────────────────────────────────────────────────────
 
@@ -2240,6 +2396,7 @@ function toggleVisibility(inputId, btn) {
 connect();
 loadMarket();
 loadSkills();
+loadPlaybooks();
 
 async function pollAccount() {
   try {
@@ -2264,6 +2421,130 @@ async function pollAccount() {
 
 pollAccount();
 setInterval(pollAccount, 15_000);
+
+// ── Playbook Store ────────────────────────────────────────────────────────────
+
+async function loadPlaybookRegistry() {
+  const url = document.getElementById('pb-registry-url').value.trim();
+  const resultsEl = document.getElementById('pb-registry-results');
+  resultsEl.innerHTML = '<div style="font-size:11px;color:var(--text3);text-align:center;padding:16px;">Loading registry...</div>';
+  try {
+    const res  = await fetch(`/api/playbooks/registry?url=${encodeURIComponent(url)}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    renderPlaybookRegistry(data);
+  } catch(e) {
+    resultsEl.innerHTML = `<div style="font-size:11px;color:var(--red);padding:10px;">✗ ${escHtml(e.message)}</div>`;
+  }
+}
+
+function renderPlaybookRegistry(data) {
+  const el = document.getElementById('pb-registry-results');
+  if (!data.playbooks?.length) {
+    el.innerHTML = '<div style="font-size:11px;color:var(--text3);text-align:center;padding:16px;">No playbooks in registry</div>';
+    return;
+  }
+  el.innerHTML = `
+    <div style="font-size:10px;color:var(--text3);margin-bottom:8px;">${data.playbooks.length} playbooks · v${data.version}</div>
+    ${data.playbooks.map(p => `
+      <div class="registry-card" id="pb-reg-card-${escHtml(p.id)}">
+        <div class="registry-card-info">
+          <div class="registry-card-name">
+            ${escHtml(p.name)}
+            <span style="font-size:9px;color:var(--cyan2)">$${p.allocation} USDC</span>
+            ${p.installed ? '<span style="font-size:9px;color:var(--green)">✓ installed</span>' : ''}
+          </div>
+          <div class="registry-card-desc">${escHtml(p.description)}</div>
+          <div class="registry-card-meta">
+            <span>by ${escHtml(p.author)}</span>
+            ${(p.tags||[]).map(t => `<span class="skill-tag">${escHtml(t)}</span>`).join('')}
+            ${p.previewUrl ? `<a href="${escHtml(p.previewUrl)}" target="_blank" style="color:var(--cyan);font-size:10px;">view ↗</a>` : ''}
+          </div>
+        </div>
+        ${p.installed
+          ? `<button class="registry-install-btn installed" disabled>✓ Installed</button>`
+          : `<button class="registry-install-btn" onclick="installPlaybook('${escHtml(p.url)}','${escHtml(p.id)}',${p.allocation})">Install</button>`
+        }
+      </div>
+    `).join('')}
+  `;
+}
+
+async function installPlaybook(url, id, allocation) {
+  const btn = document.querySelector(`#pb-reg-card-${id} .registry-install-btn`);
+  if (btn) { btn.disabled = true; btn.textContent = 'Installing...'; }
+  try {
+    const res = await fetch('/api/playbooks/install', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, allocation }),
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+    if (btn) { btn.className = 'registry-install-btn installed'; btn.textContent = '✓ Installed'; }
+    playbooks.unshift(data.playbook);
+    renderPlaybooks();
+    showPbInstallStatus(`✓ "${data.playbook.name}" installato — selezionalo nel dropdown chat`, 'success');
+  } catch(e) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Install'; }
+    showPbInstallStatus('✗ ' + e.message, 'error');
+  }
+}
+
+async function installPlaybookFromUrl() {
+  const url = document.getElementById('pb-install-url').value.trim();
+  if (!url) { showPbInstallStatus('Inserisci prima una URL', 'error'); return; }
+  try {
+    const res = await fetch('/api/playbooks/install', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, allocation: 0 }),
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+    playbooks.unshift(data.playbook);
+    renderPlaybooks();
+    document.getElementById('pb-install-url').value = '';
+    showPbInstallStatus(`✓ "${data.playbook.name}" installato`, 'success');
+  } catch(e) {
+    showPbInstallStatus('✗ ' + e.message, 'error');
+  }
+}
+
+async function installPlaybookFromPaste() {
+  const plan  = document.getElementById('pb-paste-plan').value.trim();
+  const name  = document.getElementById('pb-paste-name').value.trim();
+  const alloc = parseFloat(document.getElementById('pb-paste-alloc').value) || 0;
+  if (!plan) { showPbInstallStatus('Incolla prima il contenuto del playbook', 'error'); return; }
+  try {
+    const res = await fetch('/api/playbooks/install-raw', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plan, name, allocation: alloc }),
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+    playbooks.unshift(data.playbook);
+    renderPlaybooks();
+    document.getElementById('pb-paste-plan').value = '';
+    document.getElementById('pb-paste-name').value = '';
+    showPbInstallStatus(`✓ "${data.playbook.name}" installato`, 'success');
+  } catch(e) {
+    showPbInstallStatus('✗ ' + e.message, 'error');
+  }
+}
+
+function showPbInstallStatus(msg, type) {
+  const el = document.getElementById('pb-install-status');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.display = 'block';
+  el.style.background = type === 'success' ? 'var(--green-dim)' : 'var(--red-dim)';
+  el.style.border     = type === 'success' ? '1px solid rgba(0,255,136,0.3)' : '1px solid rgba(255,51,102,0.3)';
+  el.style.color      = type === 'success' ? 'var(--green)' : 'var(--red)';
+  setTimeout(() => { el.style.display = 'none'; }, 5000);
+}
+
 </script>
 </body>
 </html>

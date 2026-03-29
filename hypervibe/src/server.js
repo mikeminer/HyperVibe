@@ -397,7 +397,15 @@ export function createApp(config) {
           note: approval.reasoning.slice(0, 300),
         });
       }
-      broadcast({ type: 'trade_executed', approval, txResult });
+      // For exit orders, show what was placed
+      if (approval.order_type === 'EXIT_ORDERS' && txResult?.placed) {
+        const placed = txResult.placed.map(p => p.type).join(', ');
+        const errs   = txResult.errors?.join(', ');
+        broadcast({ type: 'trade_executed', approval, txResult,
+          message: `Exit orders: ${placed}${errs ? ' | Failed: ' + errs : ''}` });
+      } else {
+        broadcast({ type: 'trade_executed', approval, txResult });
+      }
     } catch (err) {
       txResult = { error: err.message };
       broadcast({ type: 'trade_error', approval, error: err.message });
@@ -550,6 +558,52 @@ export function createApp(config) {
 
 
   // ── Debug / diagnostics ────────────────────────────────────────────────────
+
+  app.post('/api/debug/test-exit', async (req, res) => {
+    const { coin = 'HYPE', side = 'LONG', size = '0.01', tp_price, sl_price } = req.body;
+    if (!runtime.signer) return res.status(400).json({ error: 'No signer' });
+    if (!runtime.walletAddress) return res.status(400).json({ error: 'No wallet' });
+
+    try {
+      const assetIndex = await runtime.api.getAssetIndex(coin);
+      const asset      = await runtime.api.getAssetInfo(coin);
+      const midPx      = await runtime.api.getPrice(coin);
+      const isLong     = side === 'LONG';
+      const exitIsBuy  = !isLong;
+
+      // Test TP1 limit order
+      const testTpPrice = tp_price || (isLong ? midPx * 1.05 : midPx * 0.95);
+      const fmt = (sz) => HyperliquidSigner.formatSize(parseFloat(sz), asset.szDecimals);
+      const px5 = (p)  => parseFloat(p).toPrecision(5);
+
+      const action = {
+        type: 'order',
+        orders: [{
+          a: assetIndex,
+          b: exitIsBuy,
+          p: px5(testTpPrice),
+          s: fmt(size),
+          r: true,
+          t: { limit: { tif: 'Gtc' } },
+        }],
+        grouping: 'na',
+      };
+
+      const nonce = Date.now();
+      const sig   = await runtime.signer.sign(action, nonce, runtime.vaultAddress ?? null);
+      const result = await runtime.api.submitAction(action, nonce, sig, runtime.vaultAddress ?? null);
+
+      res.json({
+        ok: !result?.status || result.status !== 'err',
+        coin, side, testTpPrice,
+        action,
+        hyperliquidResponse: result,
+      });
+    } catch(e) {
+      res.status(500).json({ error: e.message, stack: e.stack });
+    }
+  });
+
   app.get('/api/debug/test-signer', async (_req, res) => {
     const result = await testSigner(runtime.signer, runtime.api, 'BTC');
     res.json(result);

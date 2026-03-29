@@ -44,7 +44,7 @@ You have 20 tools covering market data, account info, and trade execution. Every
 - get_candles + compute_indicators: use for technical analysis before any entry.
 - get_funding_rate: always check before entering a position that might be held overnight.
 - place_order: always include full reasoning. The user reads this verbatim in the approval card.
-- place_exit_orders: **ALWAYS call this immediately after a position is opened.** This places real native stop-loss and take-profit orders on Hyperliquid that appear in the exchange UI and survive HyperVibe restarts. Do NOT rely only on create_trigger for exit management — those are software-only.
+- place_exit_orders: **ALWAYS call this immediately after a position is opened.** TPs are placed as native Hyperliquid limit orders (visible in HL UI, survive restarts). SL is placed as a HyperVibe Heartbeat trigger (code condition, 30s monitoring, executes market order when price hits). After approval you will see TPs in the Hyperliquid Open Orders tab.
 - create_trigger: use for monitoring and reasoning jobs (hourly reviews, funding alerts). NOT a replacement for native exit orders.
 
 ## Exit order workflow (MANDATORY after every entry)
