@@ -72,14 +72,25 @@ const runtime = {
 };
 
 function applyConfig({ anthropicKey, privateKey, walletAddress, vaultAddress, network }) {
-  if (anthropicKey) process.env.ANTHROPIC_API_KEY = anthropicKey;
+  if (anthropicKey && !anthropicKey.includes('...')) process.env.ANTHROPIC_API_KEY = anthropicKey;
 
   const net = network || 'mainnet';
-  runtime.network      = net;
-  runtime.walletAddress = walletAddress || null;
-  runtime.vaultAddress  = vaultAddress  || null;
+  runtime.network = net;
+
+  // Strip placeholder values before using
+  const isReal = (v) => v && typeof v === 'string' && !v.includes('...') && v.length > 10;
+  runtime.walletAddress = isReal(walletAddress) ? walletAddress : null;
+  runtime.vaultAddress  = isReal(vaultAddress)  ? vaultAddress  : null;
   runtime.api           = new HyperliquidAPI(net);
-  runtime.signer        = privateKey ? new HyperliquidSigner(privateKey, net) : null;
+
+  // Only create signer if private key is a real 32-byte hex key (66 chars: 0x + 64 hex)
+  const pkValid = isReal(privateKey) && /^0x[0-9a-fA-F]{64}$/.test(privateKey);
+  try {
+    runtime.signer = pkValid ? new HyperliquidSigner(privateKey, net) : null;
+  } catch(e) {
+    console.warn('[config] invalid private key, running in read-only mode:', e.message);
+    runtime.signer = null;
+  }
 }
 
 // ── App factory ───────────────────────────────────────────────────────────────
@@ -186,16 +197,18 @@ export function createApp(config) {
 
     ws.on('close', () => sessions.delete(ws));
 
-    ws.send(JSON.stringify({
-      type: 'init',
-      wallet: runtime.walletAddress,
-      network: runtime.network,
-      hasSigner: Boolean(runtime.signer),
-      hasAnthropicKey: Boolean(process.env.ANTHROPIC_API_KEY),
-      playbooks: Playbooks.list(),
-      triggers: Triggers.list(),
-      pendingApprovals: Permissions.listPending(),
-    }));
+    Promise.all([Playbooks.list(), Triggers.list(), Permissions.listPending()]).then(([playbooks, triggers, pendingApprovals]) => {
+      ws.send(JSON.stringify({
+        type: 'init',
+        wallet: runtime.walletAddress,
+        network: runtime.network,
+        hasSigner: Boolean(runtime.signer),
+        hasAnthropicKey: Boolean(process.env.ANTHROPIC_API_KEY),
+        playbooks,
+        triggers,
+        pendingApprovals,
+      }));
+    });
   });
 
   // ── REST API ───────────────────────────────────────────────────────────────
@@ -340,23 +353,23 @@ export function createApp(config) {
     }
   });
 
-  app.get('/api/playbooks', (_req, res) => res.json(Playbooks.list()));
+  app.get('/api/playbooks', async (_req, res) => res.json(await Playbooks.list()));
   app.post('/api/playbooks', (req, res) => res.json(Playbooks.create(req.body)));
-  app.get('/api/playbooks/:id', (req, res) => {
-    const pb = Playbooks.get(req.params.id);
+  app.get('/api/playbooks/:id', async (req, res) => {
+    const pb = await Playbooks.get(req.params.id);
     if (!pb) return res.status(404).json({ error: 'Not found' });
     res.json(pb);
   });
-  app.patch('/api/playbooks/:id', (req, res) => res.json(Playbooks.update(req.params.id, req.body)));
-  app.delete('/api/playbooks/:id', (req, res) => { Playbooks.archive(req.params.id); res.json({ ok: true }); });
+  app.patch('/api/playbooks/:id', async (req, res) => res.json(await Playbooks.update(req.params.id, req.body)));
+  app.delete('/api/playbooks/:id', async (req, res) => { await Playbooks.archive(req.params.id); res.json({ ok: true }); });
 
   // ── Triggers ───────────────────────────────────────────────────────────────
-  app.get('/api/triggers', (req, res) => {
+  app.get('/api/triggers', async (req, res) => {
     const { playbookId, status } = req.query;
-    res.json(Triggers.list({ playbookId, status }));
+    res.json(await Triggers.list({ playbookId, status }));
   });
-  app.post('/api/triggers', (req, res) => {
-    const trigger = Triggers.create(req.body);
+  app.post('/api/triggers', async (req, res) => {
+    const trigger = await Triggers.create(req.body);
     if (trigger.conditionMode === 'time') {
       scheduleCronTrigger(trigger, (t) => runReasoningJob(t, {}, {
         api: runtime.api, signer: runtime.signer,
@@ -365,13 +378,13 @@ export function createApp(config) {
     }
     res.json(trigger);
   });
-  app.patch('/api/triggers/:id/pause',  (req, res) => res.json(Triggers.pause(req.params.id)));
-  app.patch('/api/triggers/:id/resume', (req, res) => res.json(Triggers.resume(req.params.id)));
-  app.delete('/api/triggers/:id', (req, res) => { Triggers.delete(req.params.id); res.json({ ok: true }); });
+  app.patch('/api/triggers/:id/pause',  async (req, res) => res.json(await Triggers.pause(req.params.id)));
+  app.patch('/api/triggers/:id/resume', async (req, res) => res.json(await Triggers.resume(req.params.id)));
+  app.delete('/api/triggers/:id', async (req, res) => { await Triggers.delete(req.params.id); res.json({ ok: true }); });
 
   // ── Approvals ──────────────────────────────────────────────────────────────
-  app.get('/api/approvals',         (_req, res) => res.json(Permissions.listAll(100)));
-  app.get('/api/approvals/pending', (_req, res) => res.json(Permissions.listPending()));
+  app.get('/api/approvals',         async (_req, res) => res.json(await Permissions.listAll(100)));
+  app.get('/api/approvals/pending', async (_req, res) => res.json(await Permissions.listPending()));
 
   app.post('/api/approvals/:id/approve', async (req, res) => {
     const approval = Permissions.approve(req.params.id);
@@ -418,12 +431,12 @@ export function createApp(config) {
   });
 
   // ── Learnings ──────────────────────────────────────────────────────────────
-  app.get('/api/learnings/trades', (req, res) => {
+  app.get('/api/learnings/trades', async (req, res) => {
     const { playbookId, coin, limit } = req.query;
-    res.json(Learnings.getTrades({ playbookId, coin, limit: parseInt(limit ?? 50) }));
+    res.json(await Learnings.getTrades({ playbookId, coin, limit: parseInt(limit ?? 50) }));
   });
-  app.get('/api/learnings/observations', (req, res) => {
-    res.json(Learnings.getObservations({ playbookId: req.query.playbookId }));
+  app.get('/api/learnings/observations', async (req, res) => {
+    res.json(await Learnings.getObservations({ playbookId: req.query.playbookId }));
   });
 
 
