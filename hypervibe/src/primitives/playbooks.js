@@ -3,60 +3,46 @@
  */
 
 import { randomUUID } from 'crypto';
-import { getDb } from '../store/db.js';
+import { getDb, dbAll, dbGet, dbRun } from '../store/db.js';
 
 export const Playbooks = {
-  create({ name, description = '', allocation = 0, plan = '' }) {
-    const db = getDb();
+  async _db() { return getDb(); },
+
+  async create({ name, description = '', allocation = 0, plan = '' }) {
+    const db = await this._db();
     const id = randomUUID();
-    db.prepare(`
-      INSERT INTO playbooks (id, name, description, allocation, plan)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(id, name, description, allocation, plan);
+    dbRun(db, `INSERT INTO playbooks (id, name, description, allocation, plan) VALUES (?,?,?,?,?)`,
+      [id, name, description, allocation, plan]);
     return this.get(id);
   },
 
-  get(id) {
-    return getDb().prepare('SELECT * FROM playbooks WHERE id = ?').get(id) ?? null;
+  async get(id) {
+    const db = await this._db();
+    return dbGet(db, 'SELECT * FROM playbooks WHERE id = ?', [id]);
   },
 
-  list(status = null) {
-    const db = getDb();
-    if (status) return db.prepare('SELECT * FROM playbooks WHERE status = ? ORDER BY created_at DESC').all(status);
-    return db.prepare('SELECT * FROM playbooks ORDER BY created_at DESC').all();
+  async list(status = null) {
+    const db = await this._db();
+    if (status) return dbAll(db, 'SELECT * FROM playbooks WHERE status = ? ORDER BY created_at DESC', [status]);
+    return dbAll(db, 'SELECT * FROM playbooks ORDER BY created_at DESC');
   },
 
-  update(id, fields) {
-    const db = getDb();
+  async update(id, fields) {
+    const db = await this._db();
     const allowed = ['name', 'description', 'allocation', 'plan', 'state', 'status'];
     const sets = Object.keys(fields).filter(k => allowed.includes(k));
     if (sets.length === 0) return this.get(id);
-    const sql = `UPDATE playbooks SET ${sets.map(k => `${k} = ?`).join(', ')}, updated_at = unixepoch() * 1000 WHERE id = ?`;
-    db.prepare(sql).run(...sets.map(k => fields[k]), id);
+    const sql = `UPDATE playbooks SET ${sets.map(k => `${k} = ?`).join(', ')}, updated_at = strftime('%s','now')*1000 WHERE id = ?`;
+    dbRun(db, sql, [...sets.map(k => fields[k]), id]);
     return this.get(id);
   },
 
-  setState(id, state) {
-    return this.update(id, { state });
-  },
+  async setState(id, state) { return this.update(id, { state }); },
+  async archive(id) { return this.update(id, { status: 'archived' }); },
 
-  archive(id) {
-    return this.update(id, { status: 'archived' });
-  },
-
-  /** Format a playbook for injection into agent context */
-  toContext(id) {
-    const p = this.get(id);
+  async toContext(id) {
+    const p = await this.get(id);
     if (!p) return '';
-    return `
-## Active Playbook: ${p.name}
-**ID:** ${p.id}
-**Allocation:** $${p.allocation} USDC
-**State:** ${p.state}
-**Description:** ${p.description}
-
-### Strategy Plan
-${p.plan}
-    `.trim();
+    return `## Active Playbook: ${p.name}\n**ID:** ${p.id}\n**Allocation:** $${p.allocation} USDC\n**State:** ${p.state}\n**Description:** ${p.description}\n\n### Strategy Plan\n${p.plan}`.trim();
   },
 };
