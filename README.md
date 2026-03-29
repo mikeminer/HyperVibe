@@ -1,4 +1,4 @@
-# HyperVibe 🚀
+# HyperVibe 🚀 by pappardelle
 
 > The agentic harness for autonomous Hyperliquid perpetuals trading.
 
