@@ -114,12 +114,12 @@ export function createApp(config) {
           const tx = await executeApprovedOrder(approval, {
             api: runtime.api, signer: runtime.signer, vaultAddress: runtime.vaultAddress,
           });
-          Permissions.recordResult(approval.id, tx);
+          await Permissions.recordResult(approval.id, tx);
           broadcast({ type: 'trade_executed', approval, txResult: tx });
           await sendExecutionNotification(approval, tx);
           if (tx?.response?.data?.statuses?.[0]?.filled) {
             const fill = tx.response.data.statuses[0].filled;
-            Learnings.logTrade({
+            await Learnings.logTrade({
               playbookId: approval.playbook_id,
               coin: approval.coin, side: approval.side,
               size: parseFloat(approval.size), price: parseFloat(fill.avgPx ?? 0),
@@ -387,7 +387,7 @@ export function createApp(config) {
   app.get('/api/approvals/pending', async (_req, res) => res.json(await Permissions.listPending()));
 
   app.post('/api/approvals/:id/approve', async (req, res) => {
-    const approval = Permissions.approve(req.params.id);
+    const approval = await Permissions.approve(req.params.id);
     if (!approval) return res.status(404).json({ error: 'Approval not found or not pending' });
 
     let txResult;
@@ -396,7 +396,7 @@ export function createApp(config) {
       txResult = await executeApprovedOrder(approval, {
         api: runtime.api, signer: runtime.signer, vaultAddress: runtime.vaultAddress,
       });
-      Permissions.recordResult(approval.id, txResult);
+      await Permissions.recordResult(approval.id, txResult);
 
       if (txResult?.response?.data?.statuses?.[0]?.filled) {
         const fill = txResult.response.data.statuses[0].filled;
@@ -643,13 +643,13 @@ export function createApp(config) {
   });
 
   // ── Heartbeat ──────────────────────────────────────────────────────────────
-  startHeartbeat({
+  await startHeartbeat({
     api: runtime.api,
     broadcast,
     onHardOrder: async (trigger) => {
       const args = trigger.actionArgs ?? {};
       if (!args.coin) return;
-      const approval = Permissions.queue({
+      const approval = await Permissions.queue({
         playbookId: trigger.playbook_id,
         triggerId: trigger.id,
         coin: args.coin, side: args.side, size: args.size,
@@ -657,12 +657,12 @@ export function createApp(config) {
         reduceOnly: args.reduce_only ?? false,
         reasoning: `Hard order triggered by: "${trigger.name}"\n${trigger.context || ''}`,
       });
-      Permissions.approve(approval.id);
+      await Permissions.approve(approval.id);
       try {
         const tx = await executeApprovedOrder(Permissions.get(approval.id), {
           api: runtime.api, signer: runtime.signer, vaultAddress: runtime.vaultAddress,
         });
-        Permissions.recordResult(approval.id, tx);
+        await Permissions.recordResult(approval.id, tx);
         broadcast({ type: 'hard_order_executed', trigger, tx });
       } catch (err) {
         broadcast({ type: 'hard_order_error', trigger, error: err.message });
