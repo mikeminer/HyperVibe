@@ -71,8 +71,8 @@ export async function runAgent(messages, context, onChunk = null) {
   system += `## Current time: ${new Date().toISOString()} (UTC)\n`;
 
   if (playbookId) {
-    system += '\n' + Playbooks.toContext(playbookId) + '\n';
-    system += '\n' + Learnings.toContext(playbookId) + '\n';
+    system += '\n' + (await Playbooks.toContext(playbookId)) + '\n';
+    system += '\n' + (await Learnings.toContext(playbookId)) + '\n';
   }
 
   if (playbookId) {
@@ -87,17 +87,17 @@ export async function runAgent(messages, context, onChunk = null) {
     system += `\n## Trigger Context\nThis run was spawned by trigger: "${context.triggerContext.name}"\n${context.triggerContext.context || ''}\n`;
   }
 
-  const activePlaybooks = Playbooks.list('active');
+  const activePlaybooks = await Playbooks.list('active');
   if (activePlaybooks.length > 0) {
     system += `\n## Active Playbooks\n${activePlaybooks.map(p => `• ${p.name} (${p.id}) — ${p.state} — $${p.allocation} allocated`).join('\n')}\n`;
   }
 
-  const pendingApprovals = Permissions.listPending();
+  const pendingApprovals = await Permissions.listPending();
   if (pendingApprovals.length > 0) {
     system += `\n## Pending Approvals (${pendingApprovals.length})\n${pendingApprovals.map(a => `• ${a.id.slice(0, 8)}: ${a.side} ${a.size} ${a.coin}`).join('\n')}\n`;
   }
 
-  const playbookCtx = playbookId ? Playbooks.get(playbookId) : null;
+  const playbookCtx = playbookId ? await Playbooks.get(playbookId) : null;
 
   let currentMessages = [...messages];
   let loopCount = 0;
@@ -180,7 +180,7 @@ export async function runReasoningJob(trigger, snapshot, context, broadcast) {
   const text = finalMsg?.content?.filter(b => b.type === 'text').map(b => b.text).join('') ?? '';
 
   if (text) {
-    Learnings.addObservation({
+    await Learnings.addObservation({
       playbookId: trigger.playbookId ?? trigger.playbook_id,
       content: `[Trigger: ${trigger.name}] ${text.slice(0, 500)}`,
       tags: ['trigger', trigger.actionType],
