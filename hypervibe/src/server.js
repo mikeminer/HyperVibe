@@ -95,7 +95,7 @@ function applyConfig({ anthropicKey, privateKey, walletAddress, vaultAddress, ne
 
 // ── App factory ───────────────────────────────────────────────────────────────
 
-export function createApp(config) {
+export async function createApp(config) {
   applyConfig(config);
 
   // ── Telegram bot ───────────────────────────────────────────────────────────
