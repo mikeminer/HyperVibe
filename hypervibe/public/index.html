@@ -2218,7 +2218,7 @@ async function loadSettings() {
     const res = await fetch('/api/settings');
     const data = await res.json();
 
-    // Populate wallet address (non-sensitive)
+    // Populate non-sensitive fields
     if (data.walletAddress) document.getElementById('s-wallet').value = data.walletAddress;
     if (data.vaultAddress)  document.getElementById('s-vault').value  = data.vaultAddress;
 
@@ -2229,6 +2229,16 @@ async function loadSettings() {
     document.getElementById('pk-status').className           = 'settings-badge ' + (data.privateKeySet   ? 'badge-ok' : 'badge-missing');
     document.getElementById('wallet-status').textContent     = data.walletAddress   ? '✓ set' : 'not set';
     document.getElementById('wallet-status').className       = 'settings-badge ' + (data.walletAddress   ? 'badge-ok' : 'badge-missing');
+
+    // Show masked values in fields so Show button works
+    if (data.anthropicKeyMasked) {
+      document.getElementById('s-anthropic-key').setAttribute('data-masked', data.anthropicKeyMasked);
+      document.getElementById('s-anthropic-key').placeholder = data.anthropicKeyMasked;
+    }
+    if (data.privateKeyMasked) {
+      document.getElementById('s-pk').setAttribute('data-masked', data.privateKeyMasked);
+      document.getElementById('s-pk').placeholder = data.privateKeyMasked;
+    }
 
     // Network selector
     selectedNetwork = data.network || 'mainnet';
@@ -2385,9 +2395,21 @@ function toggleVisibility(inputId, btn) {
   if (input.type === 'password') {
     input.type = 'text';
     btn.textContent = 'Hide';
+    // If field is empty, show the masked value from placeholder
+    if (!input.value && input.getAttribute('data-masked')) {
+      input.value = input.getAttribute('data-masked');
+      input.style.color = 'var(--text3)';
+      input.setAttribute('data-showing-masked', '1');
+    }
   } else {
     input.type = 'password';
     btn.textContent = 'Show';
+    // If we were showing masked value, clear it
+    if (input.getAttribute('data-showing-masked')) {
+      input.value = '';
+      input.style.color = '';
+      input.removeAttribute('data-showing-masked');
+    }
   }
 }
 
