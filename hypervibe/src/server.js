@@ -222,18 +222,24 @@ export async function createApp(config) {
     });
   });
 
-  // GET settings — returns current config (never exposes private key)
+  // GET settings — returns current config with masked key previews
   app.get('/api/settings', (_req, res) => {
     const env = readEnv();
+    const maskKey = (v) => {
+      if (!v || v.includes('...') || v.length < 10) return null;
+      return v.slice(0, 8) + '...' + v.slice(-4);
+    };
     res.json({
       walletAddress: runtime.walletAddress ?? '',
       vaultAddress:  runtime.vaultAddress  ?? '',
       network:       runtime.network,
       hasSigner:     Boolean(runtime.signer),
       hasAnthropicKey: Boolean(process.env.ANTHROPIC_API_KEY),
-      // Show masked versions so the user knows if they're set
       anthropicKeySet: Boolean(env.ANTHROPIC_API_KEY),
       privateKeySet:   Boolean(env.HL_PRIVATE_KEY),
+      // Masked previews for Show button (first 8 + last 4 chars)
+      anthropicKeyMasked: maskKey(env.ANTHROPIC_API_KEY),
+      privateKeyMasked:   maskKey(env.HL_PRIVATE_KEY),
     });
   });
 
