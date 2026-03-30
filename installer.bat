@@ -22,15 +22,20 @@ echo [1/5] Checking Node.js...
 node --version >nul 2>&1
 if %errorlevel% equ 0 goto NODE_OK
 
-echo  Node.js not found - downloading v22 LTS...
-set NODE_MSI=%TEMP_DIR%\node-installer.msi
-powershell -Command "Invoke-WebRequest -Uri 'https://nodejs.org/dist/v22.14.0/node-v22.14.0-x64.msi' -OutFile '%NODE_MSI%'"
-if %errorlevel% neq 0 ( echo  ERROR: Download failed. Get from https://nodejs.org & pause & exit /b 1 )
-echo  Installing Node.js...
-msiexec /i "%NODE_MSI%" /quiet /norestart
-set "PATH=%PATH%;C:\Program Files\nodejs"
+echo  Node.js not found - opening installer...
+echo  1. Install Node.js from the browser window that will open
+echo  2. Click Next, Next, Install (default options are fine)
+echo  3. Come back here and press ENTER when done
+echo.
+start https://nodejs.org/dist/v22.14.0/node-v22.14.0-x64.msi
+pause
+REM Refresh PATH and retry
+set "PATH=C:\Program Files\nodejs;%PATH%"
 node --version >nul 2>&1
-if %errorlevel% neq 0 ( echo  Please CLOSE this window and run installer again. & pause & exit /b 0 )
+if %errorlevel% neq 0 (
+    echo  Node.js still not found. Please close this window and run the installer again after installing Node.js.
+    pause & exit /b 0
+)
 
 :NODE_OK
 for /f %%v in ('node --version') do set NODEVER=%%v
