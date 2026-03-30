@@ -1,161 +1,180 @@
 @echo off
+setlocal EnableDelayedExpansion
 title HyperVibe Installer
 chcp 437 >nul
+
+set INSTALL_DIR=%~dp0
+set INSTALL_DIR=%INSTALL_DIR:~0,-1%
+set HV_DIR=%INSTALL_DIR%\HyperVibe
+set APP_DIR=%HV_DIR%\hypervibe
+set ENV_FILE=%APP_DIR%\.env
+set TEMP_DIR=%TEMP%
+
 echo.
-echo  HyperVibe Installer - Starting...
+echo  ==========================================
+echo   HYPERVIBE - Installer v1.5
+echo   Installing in: %INSTALL_DIR%
+echo  ==========================================
 echo.
-powershell -NoProfile -ExecutionPolicy Bypass -Command "& {
-  $install = Split-Path -Parent '%~f0'
-  $hv      = Join-Path $install 'HyperVibe'
-  $app     = Join-Path $hv 'hypervibe'
-  $env     = Join-Path $app '.env'
 
-  Write-Host '  ==========================================' -ForegroundColor Cyan
-  Write-Host '   HYPERVIBE Installer v2.0' -ForegroundColor Cyan
-  Write-Host ('   Installing in: ' + $install) -ForegroundColor Gray
-  Write-Host '  ==========================================' -ForegroundColor Cyan
-  Write-Host ''
+REM ── Step 1: Node.js ──────────────────────────────────────────────────────────
+echo [1/5] Checking Node.js...
+node --version >nul 2>&1
+if %errorlevel% equ 0 goto NODE_OK
 
-  # ── Node.js ────────────────────────────────────────────────────────────────
-  Write-Host '[1/5] Checking Node.js...' -ForegroundColor White
-  $nodePath = (Get-Command node -ErrorAction SilentlyContinue)?.Source
-  if (-not $nodePath) { $nodePath = 'C:\Program Files\nodejs\node.exe' }
-  if (-not (Test-Path $nodePath)) {
-    Write-Host '  Not found - downloading Node.js v22 LTS...' -ForegroundColor Yellow
-    $msi = Join-Path $env:TEMP 'node-v22.msi'
-    Invoke-WebRequest 'https://nodejs.org/dist/v22.14.0/node-v22.14.0-x64.msi' -OutFile $msi
-    Write-Host '  Installing...' -ForegroundColor Yellow
-    Start-Process msiexec -ArgumentList '/i',$msi,'/quiet','/norestart' -Wait
-    $nodePath = 'C:\Program Files\nodejs\node.exe'
-    if (-not (Test-Path $nodePath)) { Write-Host '  ERROR: Install failed.' -ForegroundColor Red; Read-Host; exit 1 }
-  }
-  $nodeVer = & $nodePath --version
-  $env:PATH = 'C:\Program Files\nodejs;' + $env:PATH
-  Write-Host ('  OK - Node.js ' + $nodeVer) -ForegroundColor Green
+echo  Node.js not found - downloading v22 LTS...
+set NODE_MSI=%TEMP_DIR%\node-installer.msi
+powershell -Command "Invoke-WebRequest -Uri 'https://nodejs.org/dist/v22.14.0/node-v22.14.0-x64.msi' -OutFile '%NODE_MSI%'"
+if %errorlevel% neq 0 ( echo  ERROR: Download failed. Get from https://nodejs.org & pause & exit /b 1 )
+echo  Installing Node.js...
+msiexec /i "%NODE_MSI%" /quiet /norestart
+set "PATH=%PATH%;C:\Program Files\nodejs"
+node --version >nul 2>&1
+if %errorlevel% neq 0 ( echo  Please CLOSE this window and run installer again. & pause & exit /b 0 )
 
-  # ── Git ─────────────────────────────────────────────────────────────────────
-  Write-Host '[2/5] Checking Git...' -ForegroundColor White
-  $gitPath = (Get-Command git -ErrorAction SilentlyContinue)?.Source
-  if (-not $gitPath) { $gitPath = 'C:\Program Files\Git\cmd\git.exe' }
-  if (-not (Test-Path $gitPath)) {
-    Write-Host '  Not found - downloading Git...' -ForegroundColor Yellow
-    $exe = Join-Path $env:TEMP 'git-installer.exe'
-    Invoke-WebRequest 'https://github.com/git-for-windows/git/releases/download/v2.47.1.windows.2/Git-2.47.1.2-64-bit.exe' -OutFile $exe
-    Start-Process $exe -ArgumentList '/VERYSILENT','/NORESTART' -Wait
-    $gitPath = 'C:\Program Files\Git\cmd\git.exe'
-    if (-not (Test-Path $gitPath)) { Write-Host '  ERROR: Git install failed.' -ForegroundColor Red; Read-Host; exit 1 }
-    $env:PATH = 'C:\Program Files\Git\cmd;' + $env:PATH
-  }
-  Write-Host '  OK - Git found' -ForegroundColor Green
+:NODE_OK
+for /f %%v in ('node --version') do set NODEVER=%%v
+echo  OK - Node.js %NODEVER%
 
-  # ── Clone / Pull ─────────────────────────────────────────────────────────────
-  Write-Host '[3/5] Setting up HyperVibe...' -ForegroundColor White
-  if (Test-Path (Join-Path $app 'package.json')) {
-    Write-Host '  Already installed - pulling latest...' -ForegroundColor Gray
-    Set-Location $hv
-    & $gitPath pull
-  } else {
-    Write-Host ('  Cloning into ' + $hv + '...') -ForegroundColor Gray
-    & $gitPath clone 'https://github.com/mikeminer/HyperVibe.git' $hv
-    if ($LASTEXITCODE -ne 0) { Write-Host '  ERROR: Clone failed.' -ForegroundColor Red; Read-Host; exit 1 }
-  }
-  Write-Host '  OK' -ForegroundColor Green
+REM ── Step 2: Git ──────────────────────────────────────────────────────────────
+echo [2/5] Checking Git...
+git --version >nul 2>&1
+if %errorlevel% equ 0 goto GIT_OK
 
-  # ── npm install ──────────────────────────────────────────────────────────────
-  Write-Host '[4/5] Installing dependencies...' -ForegroundColor White
-  Set-Location $app
-  if (Test-Path 'node_modules') {
-    Write-Host '  Removing old modules...' -ForegroundColor Gray
-    Remove-Item -Recurse -Force 'node_modules' -ErrorAction SilentlyContinue
-  }
-  $npm = Join-Path 'C:\Program Files\nodejs' 'npm.cmd'
-  & $npm install
-  if ($LASTEXITCODE -ne 0) { Write-Host '  ERROR: npm install failed.' -ForegroundColor Red; Read-Host; exit 1 }
-  Write-Host '  OK - Dependencies installed' -ForegroundColor Green
+echo  Git not found - downloading...
+set GIT_EXE=%TEMP_DIR%\git-installer.exe
+powershell -Command "Invoke-WebRequest -Uri 'https://github.com/git-for-windows/git/releases/download/v2.47.1.windows.2/Git-2.47.1.2-64-bit.exe' -OutFile '%GIT_EXE%'"
+if %errorlevel% neq 0 ( echo  ERROR: Download failed. Get from https://git-scm.com & pause & exit /b 1 )
+start /wait "%GIT_EXE%" /VERYSILENT /NORESTART
+set "PATH=%PATH%;C:\Program Files\Git\cmd"
+git --version >nul 2>&1
+if %errorlevel% neq 0 ( echo  Please CLOSE this window and run installer again. & pause & exit /b 0 )
 
-  # ── Credentials ──────────────────────────────────────────────────────────────
-  Write-Host '[5/5] Configuring credentials...' -ForegroundColor White
-  Write-Host ''
+:GIT_OK
+echo  OK - Git found
 
-  $curA = ''; $curW = ''; $curK = ''; $curN = 'mainnet'
-  if (Test-Path $env) {
-    Write-Host '  Found existing .env - press ENTER to keep current values.' -ForegroundColor Gray
-    Write-Host ''
-    Get-Content $env | ForEach-Object {
-      if ($_ -match '^ANTHROPIC_API_KEY=(.+)') { $curA = $matches[1] }
-      if ($_ -match '^HL_WALLET_ADDRESS=(.+)') { $curW = $matches[1] }
-      if ($_ -match '^HL_PRIVATE_KEY=(.+)')    { $curK = $matches[1] }
-      if ($_ -match '^HL_NETWORK=(.+)')         { $curN = $matches[1] }
-    }
-  }
+REM ── Step 3: Clone / Pull ─────────────────────────────────────────────────────
+echo [3/5] Setting up HyperVibe...
+if exist "%APP_DIR%\package.json" goto DO_PULL
+echo  Cloning from GitHub into %HV_DIR%...
+git clone https://github.com/mikeminer/HyperVibe.git "%HV_DIR%"
+if %errorlevel% neq 0 ( echo  ERROR: Clone failed. Check internet. & pause & exit /b 1 )
+echo  OK - Cloned
+goto STEP4
 
-  Write-Host '  ==========================================' -ForegroundColor Cyan
-  Write-Host '   CREDENTIALS SETUP' -ForegroundColor Cyan
-  Write-Host '  ==========================================' -ForegroundColor Cyan
-  Write-Host ''
+:DO_PULL
+echo  Already installed - pulling latest...
+cd /d "%HV_DIR%"
+git pull
+echo  OK - Updated
 
-  Write-Host '  [A] ANTHROPIC_API_KEY' -ForegroundColor White
-  Write-Host '      Get yours at: https://console.anthropic.com' -ForegroundColor Gray
-  if ($curA) { Write-Host ('      Current: ' + $curA.Substring(0,[Math]::Min(20,$curA.Length)) + '...') -ForegroundColor DarkGray }
-  $newA = Read-Host '      Enter value (ENTER to keep)'
-  $finalA = if ($newA) { $newA } else { $curA }
-  Write-Host ''
+REM ── Step 4: npm install ─────────────────────────────────────────────────────
+:STEP4
+echo [4/5] Installing dependencies...
+echo  (uses sql.js - pure JavaScript, no compilation needed)
+cd /d "%APP_DIR%"
 
-  Write-Host '  [B] HL_WALLET_ADDRESS' -ForegroundColor White
-  Write-Host '      Your Hyperliquid wallet (0x...) where your funds are' -ForegroundColor Gray
-  if ($curW) { Write-Host ('      Current: ' + $curW.Substring(0,[Math]::Min(10,$curW.Length)) + '...') -ForegroundColor DarkGray }
-  $newW = Read-Host '      Enter value (ENTER to keep)'
-  $finalW = if ($newW) { $newW } else { $curW }
-  Write-Host ''
+REM Clean old node_modules to avoid version conflicts
+if exist "node_modules" (
+    echo  Removing old modules to avoid conflicts...
+    rmdir /s /q node_modules >nul 2>&1
+)
 
-  Write-Host '  [C] HL_PRIVATE_KEY' -ForegroundColor White
-  Write-Host '      API Wallet key: https://app.hyperliquid.xyz/API' -ForegroundColor Gray
-  if ($curK) { Write-Host '      Current: (already set)' -ForegroundColor DarkGray }
-  $newK = Read-Host '      Enter value (ENTER to keep)'
-  $finalK = if ($newK) { $newK } else { $curK }
-  Write-Host ''
+echo  Running npm install...
+call npm install
+if %errorlevel% neq 0 (
+    echo  ERROR: npm install failed. Check internet connection.
+    pause & exit /b 1
+)
+echo  OK - Dependencies installed
 
-  Write-Host '  [D] HL_NETWORK' -ForegroundColor White
-  Write-Host '      1 = mainnet (real funds)   2 = testnet (no real funds)' -ForegroundColor Gray
-  Write-Host ('      Current: ' + $curN) -ForegroundColor DarkGray
-  $net = Read-Host '      Choose 1 or 2 (ENTER to keep)'
-  $finalN = if ($net -eq '1') { 'mainnet' } elseif ($net -eq '2') { 'testnet' } else { $curN }
-  Write-Host ''
+REM ── Step 5: Credentials ──────────────────────────────────────────────────────
+echo [5/5] Configuring credentials...
+echo.
 
-  @(
-    '# HyperVibe Configuration',
-    ('ANTHROPIC_API_KEY=' + $finalA),
-    ('HL_WALLET_ADDRESS=' + $finalW),
-    ('HL_PRIVATE_KEY=' + $finalK),
-    ('HL_NETWORK=' + $finalN),
-    'PORT=3001'
-  ) | Set-Content $env
-  Write-Host ('  OK - Saved to ' + $env) -ForegroundColor Green
-  Write-Host ''
+set CUR_ANTHROPIC=
+set CUR_WALLET=
+set CUR_PK=
+set CUR_NETWORK=mainnet
 
-  # ── StartHyperVibe.bat ───────────────────────────────────────────────────────
-  $startBat = Join-Path $install 'StartHyperVibe.bat'
-  @(
-    '@echo off',
-    ('cd /d "' + $app + '"'),
-    'npm start',
-    'pause'
-  ) | Set-Content $startBat
-  Write-Host '  OK - Created StartHyperVibe.bat' -ForegroundColor Green
-  Write-Host ''
+if not exist "%ENV_FILE%" goto NO_ENV
+echo  Found existing .env - press ENTER to keep current values.
+echo.
+for /f "usebackq tokens=1,* delims==" %%a in ("%ENV_FILE%") do (
+    if "%%a"=="ANTHROPIC_API_KEY"  set CUR_ANTHROPIC=%%b
+    if "%%a"=="HL_WALLET_ADDRESS"  set CUR_WALLET=%%b
+    if "%%a"=="HL_PRIVATE_KEY"     set CUR_PK=%%b
+    if "%%a"=="HL_NETWORK"         set CUR_NETWORK=%%b
+)
+goto CREDS
 
-  Write-Host '  ==========================================' -ForegroundColor Green
-  Write-Host '   DONE! HyperVibe installed.' -ForegroundColor Green
-  Write-Host ('   Location: ' + $hv) -ForegroundColor Gray
-  Write-Host ('   Network:  ' + $finalN) -ForegroundColor Gray
-  Write-Host '   Start:    double-click StartHyperVibe.bat' -ForegroundColor Gray
-  Write-Host '  ==========================================' -ForegroundColor Green
-  Write-Host ''
+:NO_ENV
+if exist "%APP_DIR%\.env.example" copy "%APP_DIR%\.env.example" "%ENV_FILE%" >nul
 
-  $launch = Read-Host '  Launch HyperVibe now? (Y/N)'
-  if ($launch -eq 'Y' -or $launch -eq 'y') {
-    Set-Location $app
-    & $npm start
-  }
-  Read-Host '  Press ENTER to close'
-}"
+:CREDS
+echo  ==========================================
+echo   CREDENTIALS SETUP
+echo  ==========================================
+echo.
+echo  [A] ANTHROPIC_API_KEY
+echo      Get yours at: https://console.anthropic.com
+if not "!CUR_ANTHROPIC!"=="" echo      Current: !CUR_ANTHROPIC:~0,20!...
+set /p NEW_A="      Enter value (ENTER to keep): "
+if "!NEW_A!"=="" (set FINAL_A=!CUR_ANTHROPIC!) else (set FINAL_A=!NEW_A!)
+echo.
+
+echo  [B] HL_WALLET_ADDRESS
+echo      Your Hyperliquid wallet (0x...) where your funds are
+if not "!CUR_WALLET!"=="" echo      Current: !CUR_WALLET:~0,10!...!CUR_WALLET:~-4!
+set /p NEW_W="      Enter value (ENTER to keep): "
+if "!NEW_W!"=="" (set FINAL_W=!CUR_WALLET!) else (set FINAL_W=!NEW_W!)
+echo.
+
+echo  [C] HL_PRIVATE_KEY
+echo      API Wallet key: https://app.hyperliquid.xyz/API
+if not "!CUR_PK!"=="" echo      Current: !CUR_PK:~0,6!...!CUR_PK:~-4! (set)
+set /p NEW_K="      Enter value (ENTER to keep): "
+if "!NEW_K!"=="" (set FINAL_K=!CUR_PK!) else (set FINAL_K=!NEW_K!)
+echo.
+
+echo  [D] HL_NETWORK
+echo      1 = mainnet  (real funds)
+echo      2 = testnet  (no real funds)
+echo      Current: !CUR_NETWORK!
+set /p NET="      Choose 1 or 2 (ENTER to keep): "
+if "!NET!"=="1" (set FINAL_NET=mainnet) else if "!NET!"=="2" (set FINAL_NET=testnet) else (set FINAL_NET=!CUR_NETWORK!)
+echo.
+
+(
+    echo # HyperVibe Configuration - %DATE%
+    echo ANTHROPIC_API_KEY=!FINAL_A!
+    echo HL_WALLET_ADDRESS=!FINAL_W!
+    echo HL_PRIVATE_KEY=!FINAL_K!
+    echo HL_NETWORK=!FINAL_NET!
+    echo PORT=3001
+) > "%ENV_FILE%"
+echo  OK - Saved to %ENV_FILE%
+echo.
+
+(
+    echo @echo off
+    echo cd /d "%APP_DIR%"
+    echo npm start
+    echo pause
+) > "%INSTALL_DIR%\StartHyperVibe.bat"
+echo  OK - Created StartHyperVibe.bat
+echo.
+
+echo  ==========================================
+echo   DONE! HyperVibe installed.
+echo   Location: %HV_DIR%
+echo   Network:  !FINAL_NET!
+echo  ==========================================
+echo.
+set /p LAUNCH="  Launch now? (Y/N): "
+if /i "!LAUNCH!"=="Y" (
+    cd /d "%APP_DIR%"
+    call npm start
+)
+echo.
+pause
