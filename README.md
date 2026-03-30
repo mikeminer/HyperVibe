@@ -1,3 +1,5 @@
+<img width="1272" height="692" alt="image" src="https://github.com/user-attachments/assets/159736d3-af69-4499-a7bb-215ffe463ff6" />
+
 # HyperVibe 🚀
 
 **HyperVibe è un agente AI che fa trading autonomo su Hyperliquid per conto tuo.**
