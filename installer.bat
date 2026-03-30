@@ -46,11 +46,14 @@ set GIT_EXE=%TEMP_DIR%\git-installer.exe
 powershell -Command "Invoke-WebRequest -Uri 'https://github.com/git-for-windows/git/releases/download/v2.47.1.windows.2/Git-2.47.1.2-64-bit.exe' -OutFile '%GIT_EXE%'"
 if %errorlevel% neq 0 ( echo  ERROR: Download failed. Get from https://git-scm.com & pause & exit /b 1 )
 start /wait "%GIT_EXE%" /VERYSILENT /NORESTART
-set "PATH=%PATH%;C:\Program Files\Git\cmd"
-git --version >nul 2>&1
-if %errorlevel% neq 0 ( echo  Please CLOSE this window and run installer again. & pause & exit /b 0 )
+echo  Git installed. Relaunching installer in new window...
+start "" cmd /k "%~f0"
+exit /b 0
 
 :GIT_OK
+REM Ensure npm is available
+npm --version >nul 2>&1
+if %errorlevel% neq 0 set "PATH=C:\Program Files\nodejs;%PATH%"
 echo  OK - Git found
 
 REM ── Step 3: Clone / Pull ─────────────────────────────────────────────────────
