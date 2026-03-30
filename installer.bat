@@ -46,14 +46,20 @@ echo [2/5] Checking Git...
 git --version >nul 2>&1
 if %errorlevel% equ 0 goto GIT_OK
 
-echo  Git not found - downloading...
-set GIT_EXE=%TEMP_DIR%\git-installer.exe
-powershell -Command "Invoke-WebRequest -Uri 'https://github.com/git-for-windows/git/releases/download/v2.47.1.windows.2/Git-2.47.1.2-64-bit.exe' -OutFile '%GIT_EXE%'"
-if %errorlevel% neq 0 ( echo  ERROR: Download failed. Get from https://git-scm.com & pause & exit /b 1 )
-start /wait "%GIT_EXE%" /VERYSILENT /NORESTART
-set "PATH=%PATH%;C:\Program Files\Git\cmd"
+echo  Git not found - opening installer...
+echo  1. Install Git from the browser window that will open
+echo  2. Click Next all the way through (default options are fine)
+echo  3. Come back here and press ENTER when done
+echo.
+start https://github.com/git-for-windows/git/releases/download/v2.47.1.windows.2/Git-2.47.1.2-64-bit.exe
+pause
+REM Refresh PATH and retry
+set "PATH=C:\Program Files\Git\cmd;%PATH%"
 git --version >nul 2>&1
-if %errorlevel% neq 0 ( echo  Please CLOSE this window and run installer again. & pause & exit /b 0 )
+if %errorlevel% neq 0 (
+    echo  Git still not found. Please close this window and run the installer again after installing Git.
+    pause & exit /b 0
+)
 
 :GIT_OK
 echo  OK - Git found
