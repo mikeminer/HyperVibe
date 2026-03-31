@@ -56,6 +56,17 @@
       "tags": ["breakout", "scanner", "momentum"],
       "url": "https://raw.githubusercontent.com/mikeminer/HyperVibe/main/playbooks/top-mover-breakout.md",
       "previewUrl": "https://github.com/mikeminer/HyperVibe/blob/main/playbooks/top-mover-breakout.md"
-    }
+    },
+    {
+  "id": "hype-fee-monitor-burn-predictor",
+  "name": "HYPE Fee Monitor & Burn Predictor",
+  "description": "Monitors Hyperliquid Assistance Fund fees every 30 minutes via onchain + API. Calculates HYPE buyback/burn rate, order book imbalance, and estimates HYPE price at T+1h, T+4h, T+24h using a calibrated elasticity model. Generates BOUNCE_HIGH / BURN_SPIKE / FEE_DROP signals. Signal-only engine — no autonomous entries.",
+  "author": "pappardelle.eth",
+  "version": "1.0.0",
+  "allocation": 0,
+  "tags": ["hype", "fee-monitor", "burn", "buyback", "signal-engine", "onchain", "price-prediction", "hyperevm"],
+  "url": "https://raw.githubusercontent.com/mikeminer/HyperVibe/main/playbooks/hype-fee-monitor-burn-predictor.md",
+  "previewUrl": "https://github.com/mikeminer/HyperVibe/blob/main/playbooks/hype-fee-monitor-burn-predictor.md"
+}
   ]
 }
