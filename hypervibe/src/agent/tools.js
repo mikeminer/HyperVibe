@@ -41,47 +41,61 @@ function pad32(addr) {
 }
 
 async function toolGetHypeFees({ minutes = 30 } = {}) {
+  // Avoid eth_getLogs (too large, times out).
+  // Use eth_getBalance delta for HYPE net flow + userFills REST API for fee volume.
+
+  const startTime = Date.now() - minutes * 60 * 1000;
+
+  // 1. Block range
   const currentBlockHex = await hlRpc('eth_blockNumber', []);
   const currentBlock    = parseInt(currentBlockHex, 16);
   const blocksBack      = Math.floor((minutes * 60) / 2);
   const startBlock      = Math.max(0, currentBlock - blocksBack);
 
-  const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
-  const logs = await hlRpc('eth_getLogs', [{
-    fromBlock: '0x' + startBlock.toString(16),
-    toBlock:   '0x' + currentBlock.toString(16),
-    topics:    [TRANSFER_TOPIC],
-  }]);
+  // 2. HYPE balance delta (8 decimals on HyperEVM)
+  const [balNow, balThen] = await Promise.all([
+    hlRpc('eth_getBalance', [ASSISTANCE_FUND, '0x' + currentBlock.toString(16)]),
+    hlRpc('eth_getBalance', [ASSISTANCE_FUND, '0x' + startBlock.toString(16)]),
+  ]);
+  const balNowHype  = parseInt(balNow,  16) / 1e8;
+  const balThenHype = parseInt(balThen, 16) / 1e8;
+  const hype_delta  = balNowHype - balThenHype;
+  const hype_burned = hype_delta < 0 ? Math.abs(hype_delta) : 0;
 
-  const fundPadded = pad32(ASSISTANCE_FUND);
-  const burnPadded = pad32(BURN_ADDRESS);
+  // 3. Fee volume via userFills REST API
+  let usdc_inflow = 0;
+  let fill_count  = 0;
+  try {
+    const fills = await hlPost({ type: 'userFills', user: ASSISTANCE_FUND, startTime });
+    if (Array.isArray(fills)) {
+      fill_count  = fills.length;
+      usdc_inflow = fills.reduce((s, f) => s + Math.abs(parseFloat(f.fee ?? 0)), 0);
+    }
+  } catch (_) {
+    usdc_inflow = 0;
+  }
 
-  const inflow_logs = logs.filter(l => l.topics[2]?.toLowerCase() === fundPadded);
-  const burn_logs   = logs.filter(l =>
-    l.topics[1]?.toLowerCase() === fundPadded &&
-    l.topics[2]?.toLowerCase() === burnPadded
-  );
-
-  const usdc_inflow = inflow_logs.reduce((s, l) => s + parseInt(l.data, 16), 0) / 1e6;
-  const hype_burned = burn_logs.reduce((s, l)   => s + parseInt(l.data, 16), 0) / 1e8;
-
-  const mids       = await hlPost({ type: 'allMids' });
-  const hype_price = parseFloat(mids['HYPE'] || 0);
+  // 4. HYPE price
+  const mids        = await hlPost({ type: 'allMids' });
+  const hype_price  = parseFloat(mids['HYPE'] || 0);
   const hype_bought = hype_price > 0 ? (usdc_inflow / hype_price) * 0.85 : 0;
 
   return {
-    ok: true,
+    ok:                true,
     period_minutes:    minutes,
     block_start:       startBlock,
     block_end:         currentBlock,
     usdc_inflow,
     hype_burned,
     hype_bought,
+    hype_balance_now:  balNowHype,
+    hype_balance_then: balThenHype,
+    hype_delta,
     fee_rate_per_hour: usdc_inflow * (60 / minutes),
     hype_price,
-    inflow_tx_count:   inflow_logs.length,
-    burn_tx_count:     burn_logs.length,
-    low_activity:      inflow_logs.length === 0,
+    fill_count,
+    low_activity:      fill_count === 0 && hype_delta === 0,
+    method:            'balance_delta+userFills',
   };
 }
 
@@ -96,8 +110,10 @@ async function toolGetHypeOrderbook({ coin = 'HYPE', depth_pct = 5 } = {}) {
     return { ok: true, coin, mid_price: mid, book_imbalance: null, imbalance_label: 'unavailable', partial: true };
   }
 
-  const bids = data.levels[0][0] ?? data.levels[0] ?? [];
-  const asks = data.levels[1][0] ?? data.levels[1] ?? [];
+  // levels[0] is a flat array of bid objects {px, sz, n}
+  // levels[1] is a flat array of ask objects — NOT nested arrays
+  const bids = Array.isArray(data.levels[0]) ? data.levels[0] : [];
+  const asks = Array.isArray(data.levels[1]) ? data.levels[1] : [];
 
   const best_bid  = parseFloat(bids[0]?.px ?? 0);
   const best_ask  = parseFloat(asks[0]?.px ?? 0);
