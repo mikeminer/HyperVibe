@@ -65,8 +65,8 @@
   "version": "1.0.0",
   "allocation": 0,
   "tags": ["hype", "fee-monitor", "burn", "buyback", "signal-engine", "onchain", "price-prediction", "hyperevm"],
-  "url": "https://raw.githubusercontent.com/mikeminer/HyperVibe/main/playbooks/hype-fee-monitor-burn-predictor.md",
-  "previewUrl": "https://github.com/mikeminer/HyperVibe/blob/main/playbooks/hype-fee-monitor-burn-predictor.md"
+  "url": "https://raw.githubusercontent.com/mikeminer/HyperVibe/main/playbooks/hypePricePrediction.md",
+  "previewUrl": "https://github.com/mikeminer/HyperVibe/blob/main/playbooks/hypePricePrediction.md"
 }
   ]
 }
