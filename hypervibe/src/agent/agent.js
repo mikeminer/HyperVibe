@@ -17,7 +17,7 @@ const MAX_TOOL_LOOPS = 10;
 
 const SYSTEM_PROMPT = `You are HyperVibe, an autonomous trading agent for Hyperliquid perpetuals.
 
-You have 20 tools covering market data, account info, and trade execution. Every trade goes through an approval gate — you queue it, the user approves or rejects it. Never try to execute without queueing first.
+You have 24 tools covering market data, onchain data, account info, and trade execution. Every trade goes through an approval gate — you queue it, the user approves or rejects it. Never try to execute without queueing first.
 
 ## Your role
 - Reason carefully from live data. Never assume prices — always fetch them.
@@ -46,6 +46,11 @@ You have 20 tools covering market data, account info, and trade execution. Every
 - place_order: always include full reasoning. The user reads this verbatim in the approval card.
 - place_exit_orders: **ALWAYS call this immediately after a position is opened.** TPs are placed as native Hyperliquid limit orders (visible in HL UI, survive restarts). SL is placed as a HyperVibe Heartbeat trigger (code condition, 30s monitoring, executes market order when price hits). After approval you will see TPs in the Hyperliquid Open Orders tab.
 - create_trigger: use for monitoring and reasoning jobs (hourly reviews, funding alerts). NOT a replacement for native exit orders.
+
+## Onchain fee tools (MANDATORY — never estimate from volume)
+- get_hype_fees: fetches real USDC inflows and HYPE burns from the Assistance Fund onchain via eth_getLogs. Always call this when fee data is needed. Never substitute with volume-based estimates.
+- get_hype_orderbook: fetches live L2 order book depth and calculates bid/ask imbalance. Always call this instead of reporting book_imbalance as UNAVAILABLE.
+- get_hype_signal: runs the full fee monitor cycle in one call — fees + orderbook + signal classification + price estimates at T+1h/4h/24h. Use this for the fee monitor playbook every 30 minutes. If any of these fields show UNAVAILABLE in your output, you have failed to call the correct tool.
 
 ## Exit order workflow (MANDATORY after every entry)
 1. place_order → user approves → position opens
@@ -115,7 +120,7 @@ export async function runAgent(messages, context, onChunk = null) {
     });
 
     // Collect text content
-    const textBlocks = response.content.filter(b => b.type === 'text');
+    const textBlocks    = response.content.filter(b => b.type === 'text');
     const toolUseBlocks = response.content.filter(b => b.type === 'tool_use');
 
     for (const block of textBlocks) {
@@ -146,9 +151,9 @@ export async function runAgent(messages, context, onChunk = null) {
       }
 
       toolResults.push({
-        type: 'tool_result',
+        type:        'tool_result',
         tool_use_id: toolUse.id,
-        content: JSON.stringify(result),
+        content:     JSON.stringify(result),
       });
     }
 
@@ -182,8 +187,8 @@ export async function runReasoningJob(trigger, snapshot, context, broadcast) {
   if (text) {
     await Learnings.addObservation({
       playbookId: trigger.playbookId ?? trigger.playbook_id,
-      content: `[Trigger: ${trigger.name}] ${text.slice(0, 500)}`,
-      tags: ['trigger', trigger.actionType],
+      content:    `[Trigger: ${trigger.name}] ${text.slice(0, 500)}`,
+      tags:       ['trigger', trigger.actionType],
     });
   }
 }
