@@ -51,6 +51,16 @@
       "tags": ["risk", "drawdown", "circuit-breaker"],
       "url": "https://raw.githubusercontent.com/mikeminer/HyperVibe/main/skills/drawdown-guard.md",
       "previewUrl": "https://github.com/mikeminer/HyperVibe/blob/main/skills/drawdown-guard.md"
-    }
+    },
+    {
+  "id": "hype-fee-monitor",
+  "name": "HYPE Fee Monitor",
+  "description": "Reads onchain fee data from the Hyperliquid Assistance Fund every 30 minutes. Calculates HYPE buyback/burn rate, order book imbalance, and estimates price at T+1h/4h/24h. Emits BOUNCE_HIGH, BURN_SPIKE, and FEE_DROP signals.",
+  "author": "pappardelle.eth",
+  "version": "1.0.0",
+  "tags": ["hype", "fees", "onchain", "burn", "buyback", "signal"],
+  "url": "https://raw.githubusercontent.com/mikeminer/HyperVibe/main/skills/hype-fee-monitor.md",
+  "previewUrl": "https://github.com/mikeminer/HyperVibe/blob/main/skills/hype-fee-monitor.md"
+}
   ]
 }
