@@ -11,16 +11,15 @@ import { Learnings } from '../primitives/learnings.js';
 
 // ── Hyperliquid onchain helpers ───────────────────────────────────────────────
 
-const HL_RPC = 'https://rpc.hyperliquid.xyz/evm';
-const HL_API = 'https://api.hyperliquid.xyz/info';
+const HL_RPC          = 'https://rpc.hyperliquid.xyz/evm';
+const HL_API          = 'https://api.hyperliquid.xyz/info';
 const ASSISTANCE_FUND = '0xfefefefefefefefefefefefefefefefefefefefe';
-const BURN_ADDRESS    = '0x0000000000000000000000000000000000000000';
 
 async function hlRpc(method, params) {
   const res = await fetch(HL_RPC, {
-    method: 'POST',
+    method:  'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+    body:    JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
   });
   const data = await res.json();
   if (data.error) throw new Error(`RPC error: ${JSON.stringify(data.error)}`);
@@ -29,95 +28,138 @@ async function hlRpc(method, params) {
 
 async function hlPost(body) {
   const res = await fetch(HL_API, {
-    method: 'POST',
+    method:  'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body:    JSON.stringify(body),
   });
   return res.json();
 }
 
-function pad32(addr) {
-  return '0x000000000000000000000000' + addr.replace('0x', '').toLowerCase();
-}
+// ── toolGetHypeFees ───────────────────────────────────────────────────────────
+//
+// Two data sources combined:
+//
+// 1. VOLUME-BASED ESTIMATE (primary — always available)
+//    Uses dayNtlVlm from metaAndAssetCtxs to estimate USDC flowing into the
+//    Assistance Fund. Fee rate ~0.025% weighted avg. Fund receives ~40%.
+//
+// 2. BALANCE DELTA (secondary — real onchain signal)
+//    eth_getBalance at two blocks gives net HYPE change in the fund.
+//    HYPE on HyperEVM uses 18 decimals (standard EVM native token).
+//    Negative delta = more HYPE burned than received = burn pressure.
+//    Note: L1-level burns may not always reflect in EVM balance — proxy only.
+//
+// eth_getLogs is NOT used: without address filter it returns all Transfer
+// events across all contracts in the range and times out reliably.
 
 async function toolGetHypeFees({ minutes = 30 } = {}) {
-  // Avoid eth_getLogs (too large, times out).
-  // Use eth_getBalance delta for HYPE net flow + userFills REST API for fee volume.
-
-  const startTime = Date.now() - minutes * 60 * 1000;
-
-  // 1. Block range
   const currentBlockHex = await hlRpc('eth_blockNumber', []);
   const currentBlock    = parseInt(currentBlockHex, 16);
-  const blocksBack      = Math.floor((minutes * 60) / 2);
+  const blocksBack      = Math.floor((minutes * 60) / 2); // ~2s/block on HyperEVM
   const startBlock      = Math.max(0, currentBlock - blocksBack);
 
-  // 2. HYPE balance delta (8 decimals on HyperEVM)
-  const [balNow, balThen] = await Promise.all([
+  const [meta, mids, balNow, balThen] = await Promise.all([
+    hlPost({ type: 'metaAndAssetCtxs' }),
+    hlPost({ type: 'allMids' }),
     hlRpc('eth_getBalance', [ASSISTANCE_FUND, '0x' + currentBlock.toString(16)]),
     hlRpc('eth_getBalance', [ASSISTANCE_FUND, '0x' + startBlock.toString(16)]),
   ]);
-  const balNowHype  = parseInt(balNow,  16) / 1e8;
-  const balThenHype = parseInt(balThen, 16) / 1e8;
-  const hype_delta  = balNowHype - balThenHype;
-  const hype_burned = hype_delta < 0 ? Math.abs(hype_delta) : 0;
 
-  // 3. Fee volume via userFills REST API
-  let usdc_inflow = 0;
-  let fill_count  = 0;
-  try {
-    const fills = await hlPost({ type: 'userFills', user: ASSISTANCE_FUND, startTime });
-    if (Array.isArray(fills)) {
-      fill_count  = fills.length;
-      usdc_inflow = fills.reduce((s, f) => s + Math.abs(parseFloat(f.fee ?? 0)), 0);
-    }
-  } catch (_) {
-    usdc_inflow = 0;
+  // ── 1. Volume-based fee estimate ────────────────────────────────────────────
+  const universe   = meta[0]?.universe ?? [];
+  const ctxs       = meta[1] ?? [];
+  const hype_price = parseFloat(mids['HYPE'] || 0);
+  const hype_idx   = universe.findIndex(u => u.name === 'HYPE');
+  const hype_ctx   = hype_idx >= 0 ? ctxs[hype_idx] : {};
+
+  let total_24h_vlm = 0;
+  let hype_24h_vlm  = 0;
+  for (let i = 0; i < universe.length; i++) {
+    const vlm = parseFloat(ctxs[i]?.dayNtlVlm ?? 0);
+    total_24h_vlm += vlm;
+    if (universe[i].name === 'HYPE') hype_24h_vlm = vlm;
   }
 
-  // 4. HYPE price
-  const mids        = await hlPost({ type: 'allMids' });
-  const hype_price  = parseFloat(mids['HYPE'] || 0);
-  const hype_bought = hype_price > 0 ? (usdc_inflow / hype_price) * 0.85 : 0;
+  const window_fraction   = minutes / (24 * 60);
+  const vlm_window        = total_24h_vlm * window_fraction;
+  const FEE_RATE          = 0.00025;  // ~0.025% weighted avg
+  const FUND_SHARE        = 0.40;     // ~40% of protocol fees to Assistance Fund
+  const usdc_inflow       = vlm_window * FEE_RATE * FUND_SHARE;
+  const fee_rate_per_hour = (total_24h_vlm * FEE_RATE * FUND_SHARE) / 24;
+  const hype_bought_est   = hype_price > 0 ? (usdc_inflow / hype_price) * 0.85 : 0;
+  const hype_burned_est   = hype_bought_est * 0.80;
+
+  // ── 2. Balance delta — real onchain signal ──────────────────────────────────
+  // HYPE native token on HyperEVM = 18 decimals
+  const balNowHype          = parseInt(balNow,  16) / 1e18;
+  const balThenHype         = parseInt(balThen, 16) / 1e18;
+  const hype_delta          = balNowHype - balThenHype;
+  const hype_burned_onchain = hype_delta < 0 ? Math.abs(hype_delta) : 0;
+  const hype_accumulated    = hype_delta > 0 ? hype_delta : 0;
+
+  // ── Composite: prefer onchain if non-zero, else use estimate ───────────────
+  const hype_burned = hype_burned_onchain > 0 ? hype_burned_onchain : hype_burned_est;
+  const hype_bought = hype_burned_onchain > 0 ? hype_burned_onchain / 0.80 : hype_bought_est;
+
+  // Burn signal strength vs expected baseline (0 = at baseline, >1 = above)
+  const burn_signal_strength = hype_burned_est > 0
+    ? Math.min(hype_burned / hype_burned_est, 5)
+    : 0;
 
   return {
-    ok:                true,
-    period_minutes:    minutes,
-    block_start:       startBlock,
-    block_end:         currentBlock,
-    usdc_inflow,
-    hype_burned,
-    hype_bought,
-    hype_balance_now:  balNowHype,
-    hype_balance_then: balThenHype,
-    hype_delta,
-    fee_rate_per_hour: usdc_inflow * (60 / minutes),
+    ok:                    true,
+    period_minutes:        minutes,
+    block_start:           startBlock,
+    block_end:             currentBlock,
+    // Volume-based
+    total_24h_volume:      Math.round(total_24h_vlm),
+    hype_24h_volume:       Math.round(hype_24h_vlm),
+    volume_in_window:      Math.round(vlm_window),
+    usdc_inflow:           parseFloat(usdc_inflow.toFixed(2)),
+    fee_rate_per_hour:     parseFloat(fee_rate_per_hour.toFixed(2)),
+    // Onchain balance delta
+    hype_balance_now:      parseFloat(balNowHype.toFixed(6)),
+    hype_balance_then:     parseFloat(balThenHype.toFixed(6)),
+    hype_delta:            parseFloat(hype_delta.toFixed(6)),
+    hype_burned_onchain:   parseFloat(hype_burned_onchain.toFixed(6)),
+    hype_accumulated:      parseFloat(hype_accumulated.toFixed(6)),
+    // Composite (used by signal classifier)
+    hype_burned:           parseFloat(hype_burned.toFixed(6)),
+    hype_bought:           parseFloat(hype_bought.toFixed(6)),
+    burn_signal_strength:  parseFloat(burn_signal_strength.toFixed(3)),
+    // HYPE market context
     hype_price,
-    fill_count,
-    low_activity:      fill_count === 0 && hype_delta === 0,
-    method:            'balance_delta+userFills',
+    hype_oi:               parseFloat(hype_ctx.openInterest ?? 0),
+    hype_funding:          parseFloat(hype_ctx.funding ?? 0),
+    hype_mark_px:          parseFloat(hype_ctx.markPx ?? 0),
+    low_activity:          total_24h_vlm < 10_000_000,
+    burn_source:           hype_burned_onchain > 0 ? 'onchain_balance_delta' : 'volume_estimate',
   };
 }
+
+// ── toolGetHypeOrderbook ──────────────────────────────────────────────────────
 
 async function toolGetHypeOrderbook({ coin = 'HYPE', depth_pct = 5 } = {}) {
   const data = await hlPost({ type: 'l2Book', coin });
 
   if (!data.levels?.[0] || !data.levels?.[1]) {
-    // fallback: use markPx only
     const meta = await hlPost({ type: 'metaAndAssetCtxs' });
     const idx  = (meta[0]?.universe ?? []).findIndex(u => u.name === coin);
     const mid  = idx >= 0 ? parseFloat(meta[1]?.[idx]?.markPx || 0) : 0;
     return { ok: true, coin, mid_price: mid, book_imbalance: null, imbalance_label: 'unavailable', partial: true };
   }
 
-  // levels[0] is a flat array of bid objects {px, sz, n}
-  // levels[1] is a flat array of ask objects — NOT nested arrays
+  // levels[0] = flat array of bid objects {px, sz, n} — NOT nested
   const bids = Array.isArray(data.levels[0]) ? data.levels[0] : [];
   const asks = Array.isArray(data.levels[1]) ? data.levels[1] : [];
 
-  const best_bid  = parseFloat(bids[0]?.px ?? 0);
-  const best_ask  = parseFloat(asks[0]?.px ?? 0);
-  const mid       = (best_bid + best_ask) / 2;
+  if (!bids.length || !asks.length) {
+    return { ok: false, error: 'Empty bid or ask array in l2Book response' };
+  }
+
+  const best_bid   = parseFloat(bids[0]?.px ?? 0);
+  const best_ask   = parseFloat(asks[0]?.px ?? 0);
+  const mid        = (best_bid + best_ask) / 2;
   const spread_bps = mid > 0 ? ((best_ask - best_bid) / mid * 10000).toFixed(2) : '0';
 
   const bid_depth = bids
@@ -131,11 +173,19 @@ async function toolGetHypeOrderbook({ coin = 'HYPE', depth_pct = 5 } = {}) {
   const book_imbalance = total > 0 ? parseFloat(((bid_depth - ask_depth) / total).toFixed(4)) : 0;
 
   return {
-    ok: true, coin, mid_price: mid, best_bid, best_ask,
-    spread_bps, bid_depth, ask_depth, book_imbalance,
+    ok: true, coin,
+    mid_price:       mid,
+    best_bid,
+    best_ask,
+    spread_bps,
+    bid_depth:       parseFloat(bid_depth.toFixed(2)),
+    ask_depth:       parseFloat(ask_depth.toFixed(2)),
+    book_imbalance,
     imbalance_label: book_imbalance > 0.15 ? 'bid-heavy' : book_imbalance < -0.15 ? 'ask-heavy' : 'neutral',
   };
 }
+
+// ── toolGetHypeSignal ─────────────────────────────────────────────────────────
 
 async function toolGetHypeSignal({ minutes = 30 } = {}) {
   const [fees, book] = await Promise.all([
@@ -145,30 +195,37 @@ async function toolGetHypeSignal({ minutes = 30 } = {}) {
 
   const imbalance = book.ok ? book.book_imbalance : null;
 
+  // Signal classification
   let signal = 'NEUTRAL';
-  if (!fees.low_activity && fees.usdc_inflow > 0) {
-    if (imbalance !== null && imbalance > 0.15)      signal = 'BOUNCE_HIGH';
-    else if (imbalance !== null && imbalance > 0.05) signal = 'BOUNCE_MED';
+  if (fees.burn_signal_strength > 2) {
+    signal = 'BURN_SPIKE';
+  } else if (!fees.low_activity) {
+    if      (imbalance !== null && imbalance > 0.15)  signal = 'BOUNCE_HIGH';
+    else if (imbalance !== null && imbalance > 0.05)  signal = 'BOUNCE_MED';
+    else if (imbalance !== null && imbalance < -0.15) signal = 'FEE_DROP';
   }
-  if (fees.hype_burned > 0) {
-    const avgBurn = fees.hype_burned; // single period; caller tracks rolling avg
-    if (avgBurn > 0) signal = signal === 'BOUNCE_HIGH' ? 'BOUNCE_HIGH' : signal === 'NEUTRAL' ? 'NEUTRAL' : signal;
-  }
+  // Upgrade BOUNCE_MED if burn is elevated
+  if (signal === 'BOUNCE_MED' && fees.burn_signal_strength > 1.5) signal = 'BOUNCE_HIGH';
 
-  const CIRCULATING   = 333_000_000;
-  const ELASTICITY    = 2.5;
-  const supply_1h     = fees.hype_price > 0
+  // Price impact model
+  const CIRCULATING = 333_000_000;
+  const ELASTICITY  = 2.5;
+  const supply_1h   = fees.hype_price > 0 && fees.hype_burned > 0
     ? (fees.hype_burned * (60 / minutes)) / CIRCULATING * 100
     : 0;
 
   return {
-    ok: true, signal, fees, book: book.ok ? book : null,
+    ok: true,
+    signal,
+    fees,
+    book:            book.ok ? book : null,
     price_estimates: {
-      current: fees.hype_price,
-      t1h:     parseFloat((fees.hype_price * (1 + supply_1h        * ELASTICITY)).toFixed(4)),
-      t4h:     parseFloat((fees.hype_price * (1 + supply_1h * 4    * ELASTICITY)).toFixed(4)),
-      t24h:    parseFloat((fees.hype_price * (1 + supply_1h * 24   * ELASTICITY)).toFixed(4)),
+      current:                 fees.hype_price,
+      t1h:                     parseFloat((fees.hype_price * (1 + supply_1h * ELASTICITY)).toFixed(4)),
+      t4h:                     parseFloat((fees.hype_price * (1 + supply_1h * 4 * ELASTICITY)).toFixed(4)),
+      t24h:                    parseFloat((fees.hype_price * (1 + supply_1h * 24 * ELASTICITY)).toFixed(4)),
       supply_reduction_pct_1h: supply_1h.toFixed(6),
+      elasticity_coeff:        ELASTICITY,
     },
   };
 }
@@ -270,7 +327,7 @@ export const TOOL_DEFINITIONS = [
   // ── Onchain fee tools ──────────────────────────────────────────────────────
   {
     name: 'get_hype_fees',
-    description: 'Fetch real USDC inflows and HYPE burn data from the Hyperliquid Assistance Fund onchain via HyperEVM eth_getLogs. Returns usdc_inflow, hype_burned, fee_rate_per_hour, hype_price. Always use this instead of estimating from volume.',
+    description: 'Fetch HYPE fee data combining two sources: (1) volume-based USDC inflow estimate from protocol dayNtlVlm, (2) real onchain HYPE balance delta of the Assistance Fund via eth_getBalance at two blocks. Returns usdc_inflow, hype_burned, hype_delta, burn_signal_strength, fee_rate_per_hour, burn_source. Always call this — never estimate manually.',
     input_schema: {
       type: 'object',
       properties: {
@@ -280,7 +337,7 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'get_hype_orderbook',
-    description: 'Fetch live L2 order book for a Hyperliquid perpetual and calculate bid/ask depth and imbalance. Returns mid_price, spread_bps, bid_depth, ask_depth, book_imbalance (-1 to +1), imbalance_label.',
+    description: 'Fetch live L2 order book for a Hyperliquid perpetual. Returns mid_price, spread_bps, bid_depth, ask_depth, book_imbalance (-1 to +1), imbalance_label (bid-heavy/ask-heavy/neutral).',
     input_schema: {
       type: 'object',
       properties: {
@@ -291,7 +348,7 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'get_hype_signal',
-    description: 'Run the full HYPE fee monitor cycle: fetches onchain fees + live orderbook, classifies signal (BOUNCE_HIGH / BOUNCE_MED / NEUTRAL / FEE_DROP / BURN_SPIKE), returns price estimates at T+1h T+4h T+24h. Use for the fee monitor playbook every 30 minutes.',
+    description: 'Run the full HYPE fee monitor cycle: onchain fees + live orderbook + signal classification (BOUNCE_HIGH / BOUNCE_MED / NEUTRAL / FEE_DROP / BURN_SPIKE) + price estimates at T+1h T+4h T+24h. Use every 30 minutes. If any field shows UNAVAILABLE, you failed to call this tool.',
     input_schema: {
       type: 'object',
       properties: {
@@ -306,14 +363,14 @@ export const TOOL_DEFINITIONS = [
     input_schema: {
       type: 'object',
       properties: {
-        coin:       { type: 'string' },
-        side:       { type: 'string', enum: ['BUY','SELL'] },
-        size:       { type: 'number', description: 'Size in coin units' },
-        order_type: { type: 'string', enum: ['MARKET','LIMIT'], default: 'MARKET' },
-        price:      { type: 'number' },
-        reduce_only:{ type: 'boolean', default: false },
-        reasoning:  { type: 'string' },
-        playbook_id:{ type: 'string' },
+        coin:        { type: 'string' },
+        side:        { type: 'string', enum: ['BUY','SELL'] },
+        size:        { type: 'number', description: 'Size in coin units' },
+        order_type:  { type: 'string', enum: ['MARKET','LIMIT'], default: 'MARKET' },
+        price:       { type: 'number' },
+        reduce_only: { type: 'boolean', default: false },
+        reasoning:   { type: 'string' },
+        playbook_id: { type: 'string' },
       },
       required: ['coin','side','size','reasoning'],
     },
@@ -372,15 +429,15 @@ export const TOOL_DEFINITIONS = [
     input_schema: {
       type: 'object',
       properties: {
-        name:            { type: 'string' },
-        playbook_id:     { type: 'string' },
-        watch_coins:     { type: 'array', items: { type: 'string' } },
-        condition_mode:  { type: 'string', enum: ['code','time','llm'] },
-        condition_expr:  { type: 'string' },
-        action_type:     { type: 'string', enum: ['hard_order','reasoning_job'] },
-        action_args:     { type: 'object' },
-        context:         { type: 'string' },
-        expires_at:      { type: 'number' },
+        name:           { type: 'string' },
+        playbook_id:    { type: 'string' },
+        watch_coins:    { type: 'array', items: { type: 'string' } },
+        condition_mode: { type: 'string', enum: ['code','time','llm'] },
+        condition_expr: { type: 'string' },
+        action_type:    { type: 'string', enum: ['hard_order','reasoning_job'] },
+        action_args:    { type: 'object' },
+        context:        { type: 'string' },
+        expires_at:     { type: 'number' },
       },
       required: ['name','condition_mode','condition_expr','action_type'],
     },
@@ -430,19 +487,19 @@ export async function handleTool(name, input, { api, signer, walletAddress, vaul
       const candles = await api.getCandles(input.coin, input.interval ?? '1h', 200);
       return computeIndicators(candles, input.indicators);
     }
-    case 'get_funding_rate':   return api.getFundingRate(input.coin);
-    case 'get_orderbook':      return api.getOrderbook(input.coin, input.levels ?? 10);
-    case 'get_market_info':    return api.getMarketInfo(input.coin);
-    case 'get_top_movers':     return api.getTopMovers(input.n ?? 10);
-    case 'search_coins':       return api.searchCoins(input.query);
-    case 'get_vault_details':  return api.getVaultDetails(input.vault_address);
+    case 'get_funding_rate':    return api.getFundingRate(input.coin);
+    case 'get_orderbook':       return api.getOrderbook(input.coin, input.levels ?? 10);
+    case 'get_market_info':     return api.getMarketInfo(input.coin);
+    case 'get_top_movers':      return api.getTopMovers(input.n ?? 10);
+    case 'search_coins':        return api.searchCoins(input.query);
+    case 'get_vault_details':   return api.getVaultDetails(input.vault_address);
 
-    // ── Onchain fee tools ────────────────────────────────────────────────────
-    case 'get_hype_fees':      return toolGetHypeFees(input);
-    case 'get_hype_orderbook': return toolGetHypeOrderbook(input);
-    case 'get_hype_signal':    return toolGetHypeSignal(input);
+    // ── Onchain fee tools ──────────────────────────────────────────────────────
+    case 'get_hype_fees':       return toolGetHypeFees(input);
+    case 'get_hype_orderbook':  return toolGetHypeOrderbook(input);
+    case 'get_hype_signal':     return toolGetHypeSignal(input);
 
-    // ── Write tools ──────────────────────────────────────────────────────────
+    // ── Write tools ────────────────────────────────────────────────────────────
     case 'place_order': {
       const approval = Permissions.queue({
         playbookId:  input.playbook_id ?? playbookContext?.id ?? null,
@@ -573,7 +630,6 @@ export async function executeApprovedOrder(approval, { api, signer, vaultAddress
       return res;
     };
 
-    // Consolidate TPs — minimum $11 notional per order
     const MIN_NOTIONAL = 11.5;
     const tpCandidates = [
       tp1_price && tp1_size ? { price: parseFloat(tp1_price), size: parseFloat(tp1_size), label: 'TP1' } : null,
@@ -584,7 +640,9 @@ export async function executeApprovedOrder(approval, { api, signer, vaultAddress
     const tpOrders = [];
     let acc = null;
     for (const tp of tpCandidates) {
-      acc = acc ? { price: tp.price, size: acc.size + tp.size, label: acc.label + '+' + tp.label } : { ...tp };
+      acc = acc
+        ? { price: tp.price, size: acc.size + tp.size, label: acc.label + '+' + tp.label }
+        : { ...tp };
       if (acc.size * acc.price >= MIN_NOTIONAL) { tpOrders.push({ ...acc }); acc = null; }
     }
     if (acc) {
@@ -605,18 +663,17 @@ export async function executeApprovedOrder(approval, { api, signer, vaultAddress
       }
     }
 
-    // SL as HyperVibe Heartbeat trigger
     try {
       const slExpr = isLong
         ? `prices["${coin}"] <= ${stop_loss_price}`
         : `prices["${coin}"] >= ${stop_loss_price}`;
       Triggers.create({
-        name: `SL ${coin} @ $${stop_loss_price}`,
+        name:       `SL ${coin} @ $${stop_loss_price}`,
         watchCoins: [coin], conditionMode: 'code', conditionExpr: slExpr,
         actionType: 'hard_order',
         actionArgs: { coin, side: exitIsBuy ? 'BUY' : 'SELL', size: fmt(total_size), order_type: 'MARKET', reduce_only: true },
-        context: `Auto SL: ${position_side} ${total_size} ${coin}. Market order when price hits $${stop_loss_price}.`,
-        expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+        context:    `Auto SL: ${position_side} ${total_size} ${coin}. Market order when price hits $${stop_loss_price}.`,
+        expiresAt:  Date.now() + 30 * 24 * 60 * 60 * 1000,
       });
       results.push({ type: 'SL', price: stop_loss_price, mode: 'HyperVibe 30s' });
     } catch(e) {
@@ -626,8 +683,8 @@ export async function executeApprovedOrder(approval, { api, signer, vaultAddress
 
     if (results.length === 0) throw new Error(`All exit orders failed:\n${errors.join('\n')}`);
     return {
-      status: errors.length === 0 ? 'ok' : 'partial',
-      placed: results, errors,
+      status:   errors.length === 0 ? 'ok' : 'partial',
+      placed:   results, errors,
       response: { data: { statuses: [{ resting: { oid: results[0]?.oid, note: results.map(r => r.type + '@$' + r.price).join(', ') } }] } },
     };
   }
@@ -668,7 +725,7 @@ export async function executeApprovedOrder(approval, { api, signer, vaultAddress
   const payload = await signer.buildOrderAction({
     assetIndex, isBuy, price, size,
     reduceOnly: Boolean(approval.reduce_only),
-    tif: isMarket ? 'Ioc' : 'Gtc',
+    tif:        isMarket ? 'Ioc' : 'Gtc',
     vaultAddress,
   });
 
