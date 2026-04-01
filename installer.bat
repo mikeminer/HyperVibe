@@ -12,7 +12,7 @@ set TEMP_DIR=%TEMP%
 
 echo.
 echo  ==========================================
-echo   HYPERVIBE - Installer v1.5
+echo   HYPERVIBE - Installer v1.6
 echo   Installing in: %INSTALL_DIR%
 echo  ==========================================
 echo.
@@ -82,7 +82,6 @@ echo  OK - Updated
 REM ── Step 4: npm install ─────────────────────────────────────────────────────
 :STEP4
 echo [4/5] Installing dependencies...
-echo  (uses sql.js - pure JavaScript, no compilation needed)
 cd /d "%APP_DIR%"
 
 REM Clean old node_modules to avoid version conflicts
@@ -107,6 +106,8 @@ set CUR_ANTHROPIC=
 set CUR_WALLET=
 set CUR_PK=
 set CUR_NETWORK=mainnet
+set CUR_TG_TOKEN=
+set CUR_TG_CHAT=
 
 if not exist "%ENV_FILE%" goto NO_ENV
 echo  Found existing .env - press ENTER to keep current values.
@@ -116,6 +117,8 @@ for /f "usebackq tokens=1,* delims==" %%a in ("%ENV_FILE%") do (
     if "%%a"=="HL_WALLET_ADDRESS"  set CUR_WALLET=%%b
     if "%%a"=="HL_PRIVATE_KEY"     set CUR_PK=%%b
     if "%%a"=="HL_NETWORK"         set CUR_NETWORK=%%b
+    if "%%a"=="TELEGRAM_BOT_TOKEN" set CUR_TG_TOKEN=%%b
+    if "%%a"=="TELEGRAM_CHAT_ID"   set CUR_TG_CHAT=%%b
 )
 goto CREDS
 
@@ -127,6 +130,7 @@ echo  ==========================================
 echo   CREDENTIALS SETUP
 echo  ==========================================
 echo.
+
 echo  [A] ANTHROPIC_API_KEY
 echo      Get yours at: https://console.anthropic.com
 if not "!CUR_ANTHROPIC!"=="" echo      Current: !CUR_ANTHROPIC:~0,20!...
@@ -156,6 +160,20 @@ set /p NET="      Choose 1 or 2 (ENTER to keep): "
 if "!NET!"=="1" (set FINAL_NET=mainnet) else if "!NET!"=="2" (set FINAL_NET=testnet) else (set FINAL_NET=!CUR_NETWORK!)
 echo.
 
+echo  [E] TELEGRAM_BOT_TOKEN  (optional - for trade approvals via Telegram)
+echo      Create a bot at: https://t.me/BotFather  then /newbot
+if not "!CUR_TG_TOKEN!"=="" echo      Current: !CUR_TG_TOKEN:~0,10!... (set)
+set /p NEW_TGT="      Enter value (ENTER to skip/keep): "
+if "!NEW_TGT!"=="" (set FINAL_TGT=!CUR_TG_TOKEN!) else (set FINAL_TGT=!NEW_TGT!)
+echo.
+
+echo  [F] TELEGRAM_CHAT_ID  (optional - your Telegram user/group ID)
+echo      Get your ID at: https://t.me/userinfobot
+if not "!CUR_TG_CHAT!"=="" echo      Current: !CUR_TG_CHAT! (set)
+set /p NEW_TGC="      Enter value (ENTER to skip/keep): "
+if "!NEW_TGC!"=="" (set FINAL_TGC=!CUR_TG_CHAT!) else (set FINAL_TGC=!NEW_TGC!)
+echo.
+
 (
     echo # HyperVibe Configuration - %DATE%
     echo ANTHROPIC_API_KEY=!FINAL_A!
@@ -163,6 +181,10 @@ echo.
     echo HL_PRIVATE_KEY=!FINAL_K!
     echo HL_NETWORK=!FINAL_NET!
     echo PORT=3001
+    echo.
+    echo # Telegram (optional - leave empty to disable)
+    echo TELEGRAM_BOT_TOKEN=!FINAL_TGT!
+    echo TELEGRAM_CHAT_ID=!FINAL_TGC!
 ) > "%ENV_FILE%"
 echo  OK - Saved to %ENV_FILE%
 echo.
