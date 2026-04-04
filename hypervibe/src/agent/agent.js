@@ -3,7 +3,7 @@
  * Loaded when a trigger fires a reasoning_job or the user chats.
  */
 
-import Anthropic from '@anthropic-ai/sdk';
+import llm from './llm-provider.js';
 import { TOOL_DEFINITIONS, handleTool } from './tools.js';
 import { Playbooks } from '../primitives/playbooks.js';
 import { Learnings } from '../primitives/learnings.js';
@@ -11,7 +11,6 @@ import { Triggers } from '../primitives/triggers.js';
 import { Skills } from '../primitives/skills.js';
 import { Permissions } from '../primitives/permissions.js';
 
-const MODEL = 'claude-sonnet-4-20250514';
 const MAX_TOKENS = 4096;
 const MAX_TOOL_LOOPS = 10;
 
@@ -58,8 +57,6 @@ You have 24 tools covering market data, onchain data, account info, and trade ex
 3. Optionally create a time-based reasoning_job trigger for trailing stop management
 Never skip step 2. Native orders on Hyperliquid protect the position even when HyperVibe is offline.
 `;
-
-const client = new Anthropic();
 
 /**
  * Run a single agent turn.
@@ -111,8 +108,7 @@ export async function runAgent(messages, context, onChunk = null) {
   while (loopCount < MAX_TOOL_LOOPS) {
     loopCount++;
 
-    const response = await client.messages.create({
-      model: MODEL,
+    const response = await llm.create({
       max_tokens: MAX_TOKENS,
       system,
       tools: TOOL_DEFINITIONS,
