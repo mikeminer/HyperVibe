@@ -9,7 +9,6 @@
 - { content: [ {type:‘text’|‘tool_use’, …} ], stop_reason: ‘…’ }
   */
 
-import fetch from ‘node-fetch’;
 
 const PROVIDER        = (process.env.PROVIDER || ‘ollama’).toLowerCase();
 const OLLAMA_BASE     = process.env.OLLAMA_BASE_URL || ‘http://localhost:11434’;
