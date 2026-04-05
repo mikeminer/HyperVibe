@@ -114,7 +114,7 @@ powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/m
 
 يفتح المتصفح على **http://localhost:3001**
 
-لإعادة تشغيل HyperVibe: انقر مرتين على **StartHyperVibe.bat** في نفس المجلد الذي وضعت فيه المثبت.
+لإعادة تشغيل HyperVibe: انقر مرتين على **HyperVibe.bat** في نفس المجلد الذي وضعت فيه المثبت.
 
 ---
 
