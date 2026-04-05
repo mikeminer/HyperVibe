@@ -8,10 +8,11 @@ set INSTALL_DIR=%INSTALL_DIR:~0,-1%
 set HV_DIR=%INSTALL_DIR%\HyperVibe
 set APP_DIR=%HV_DIR%\hypervibe
 set ENV_FILE=%APP_DIR%\.env
+set WRITE_ENV=%TEMP%\hv_write_env.js
 
 echo.
 echo  ==========================================
-echo   HYPERVIBE - Installer v2.1
+echo   HYPERVIBE - Installer v2.2
 echo   Installing in: %INSTALL_DIR%
 echo  ==========================================
 echo.
@@ -183,7 +184,6 @@ if %errorlevel% equ 0 (
     echo  OK - !OLLAMA_MODEL! gia' installato
     goto OLLAMA_DONE
 )
-
 echo.
 echo  Download !OLLAMA_MODEL! - potrebbe volerci qualche minuto...
 echo.
@@ -217,11 +217,6 @@ if exist "%ENV_FILE%" (
     )
 )
 
-echo  ==========================================
-echo   HYPERLIQUID
-echo  ==========================================
-echo.
-
 echo  [A] HL_WALLET_ADDRESS  (0x... - il tuo wallet)
 if not "!CUR_WALLET!"=="" echo      Attuale: !CUR_WALLET:~0,10!...!CUR_WALLET:~-4!
 set /p NEW_W="      Valore (INVIO per mantenere): "
@@ -235,60 +230,55 @@ set /p NEW_K="      Valore (INVIO per mantenere): "
 if "!NEW_K!"=="" (set FINAL_K=!CUR_PK!) else (set FINAL_K=!NEW_K!)
 echo.
 
-echo  [C] HL_NETWORK
-echo      1 = mainnet  (fondi reali)
-echo      2 = testnet  (fondi finti)
+echo  [C] HL_NETWORK  (mainnet / testnet)
 echo      Attuale: !CUR_NETWORK!
-set /p NET="      Scegli 1 o 2 (INVIO per mantenere): "
+set /p NET="      Scegli 1=mainnet 2=testnet (INVIO per mantenere): "
 if "!NET!"=="1" (set FINAL_NET=mainnet) else if "!NET!"=="2" (set FINAL_NET=testnet) else (set FINAL_NET=!CUR_NETWORK!)
 echo.
 
-echo  [D] TELEGRAM_BOT_TOKEN  (opzionale)
-echo      Crea un bot su: https://t.me/BotFather
-if not "!CUR_TG_TOKEN!"=="" echo      Attuale: !CUR_TG_TOKEN:~0,10!... (impostato)
-set /p NEW_TGT="      Valore (INVIO per saltare/mantenere): "
+echo  [D] TELEGRAM_BOT_TOKEN  (opzionale - INVIO per saltare)
+if not "!CUR_TG_TOKEN!"=="" echo      Attuale: !CUR_TG_TOKEN:~0,10!...
+set /p NEW_TGT="      Valore: "
 if "!NEW_TGT!"=="" (set FINAL_TGT=!CUR_TG_TOKEN!) else (set FINAL_TGT=!NEW_TGT!)
 echo.
 
-echo  [E] TELEGRAM_CHAT_ID  (opzionale)
-echo      Ottieni il tuo ID su: https://t.me/userinfobot
-if not "!CUR_TG_CHAT!"=="" echo      Attuale: !CUR_TG_CHAT! (impostato)
-set /p NEW_TGC="      Valore (INVIO per saltare/mantenere): "
+echo  [E] TELEGRAM_CHAT_ID  (opzionale - INVIO per saltare)
+if not "!CUR_TG_CHAT!"=="" echo      Attuale: !CUR_TG_CHAT!
+set /p NEW_TGC="      Valore: "
 if "!NEW_TGC!"=="" (set FINAL_TGC=!CUR_TG_CHAT!) else (set FINAL_TGC=!NEW_TGC!)
 echo.
 
-REM ── Scrivi .env tramite Node.js (evita bug batch con if dentro parentesi) ─────
-set HV_ENV_FILE=%ENV_FILE%
-set HV_PROVIDER=!PROVIDER!
-set HV_OLLAMA_MODEL=!OLLAMA_MODEL!
-set HV_CLAUDE_MODEL=!CLAUDE_MODEL!
-set HV_ANTHROPIC_KEY=!FINAL_A!
-set HV_WALLET=!FINAL_W!
-set HV_PK=!FINAL_K!
-set HV_NETWORK=!FINAL_NET!
-set HV_TG_TOKEN=!FINAL_TGT!
-set HV_TG_CHAT=!FINAL_TGC!
+REM ── Scrivi .env tramite file JS temporaneo ────────────────────────────────────
+set HV_P=!PROVIDER!
+set HV_OM=!OLLAMA_MODEL!
+set HV_CM=!CLAUDE_MODEL!
+set HV_AK=!FINAL_A!
+set HV_W=!FINAL_W!
+set HV_K=!FINAL_K!
+set HV_N=!FINAL_NET!
+set HV_TT=!FINAL_TGT!
+set HV_TC=!FINAL_TGC!
+set HV_EF=!ENV_FILE!
 
-node -e "
-const fs   = require('fs');
-const path = require('path');
-const e    = process.env;
-const lines = [];
-lines.push('# HyperVibe Configuration');
-lines.push('PROVIDER=' + e.HV_PROVIDER);
-if (e.HV_OLLAMA_MODEL)    lines.push('OLLAMA_MODEL=' + e.HV_OLLAMA_MODEL);
-if (e.HV_OLLAMA_MODEL)    lines.push('OLLAMA_BASE_URL=http://localhost:11434');
-if (e.HV_ANTHROPIC_KEY)   lines.push('ANTHROPIC_API_KEY=' + e.HV_ANTHROPIC_KEY);
-if (e.HV_CLAUDE_MODEL)    lines.push('CLAUDE_MODEL=' + e.HV_CLAUDE_MODEL);
-lines.push('HL_WALLET_ADDRESS=' + (e.HV_WALLET  || ''));
-lines.push('HL_PRIVATE_KEY='    + (e.HV_PK      || ''));
-lines.push('HL_NETWORK='        + (e.HV_NETWORK || 'mainnet'));
-lines.push('PORT=3001');
-lines.push('TELEGRAM_BOT_TOKEN=' + (e.HV_TG_TOKEN || ''));
-lines.push('TELEGRAM_CHAT_ID='   + (e.HV_TG_CHAT  || ''));
-fs.writeFileSync(e.HV_ENV_FILE, lines.join('\n') + '\n', 'utf8');
-console.log(' OK - .env salvato in ' + e.HV_ENV_FILE);
-"
+> "%WRITE_ENV%" echo var fs=require('fs');
+>> "%WRITE_ENV%" echo var e=process.env;
+>> "%WRITE_ENV%" echo var out=[];
+>> "%WRITE_ENV%" echo out.push('PROVIDER='+e.HV_P);
+>> "%WRITE_ENV%" echo if(e.HV_OM) out.push('OLLAMA_MODEL='+e.HV_OM);
+>> "%WRITE_ENV%" echo if(e.HV_OM) out.push('OLLAMA_BASE_URL=http://localhost:11434');
+>> "%WRITE_ENV%" echo if(e.HV_AK) out.push('ANTHROPIC_API_KEY='+e.HV_AK);
+>> "%WRITE_ENV%" echo if(e.HV_CM) out.push('CLAUDE_MODEL='+e.HV_CM);
+>> "%WRITE_ENV%" echo out.push('HL_WALLET_ADDRESS='+(e.HV_W||''));
+>> "%WRITE_ENV%" echo out.push('HL_PRIVATE_KEY='+(e.HV_K||''));
+>> "%WRITE_ENV%" echo out.push('HL_NETWORK='+(e.HV_N||'mainnet'));
+>> "%WRITE_ENV%" echo out.push('PORT=3001');
+>> "%WRITE_ENV%" echo out.push('TELEGRAM_BOT_TOKEN='+(e.HV_TT||''));
+>> "%WRITE_ENV%" echo out.push('TELEGRAM_CHAT_ID='+(e.HV_TC||''));
+>> "%WRITE_ENV%" echo fs.writeFileSync(e.HV_EF,out.join('\n')+'\n','utf8');
+>> "%WRITE_ENV%" echo console.log('OK - .env salvato');
+
+node "%WRITE_ENV%"
+del "%WRITE_ENV%" >nul 2>&1
 
 REM ── StartHyperVibe.bat ────────────────────────────────────────────────────────
 (
