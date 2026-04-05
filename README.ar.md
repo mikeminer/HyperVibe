@@ -74,7 +74,7 @@ Skill هي **دليل تقني** تعلمه للوكيل مرة واحدة. في
 افتح **موجه الأوامر (CMD)** والصق هذا:
 
 ```
-powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/mikeminer/HyperVibe/main/installer.bat' -OutFile install-hypervibe.bat" && install-hypervibe.bat
+powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/mikeminer/HyperVibe/main/HyperVibe.bat' -OutFile HyperVibe.bat" && HyperVibe.bat
 ```
 
 **كيف تفتح CMD:** اضغط **Windows + R** ← اكتب `cmd` ← اضغط Enter ← الصق الأمر.
