@@ -13,6 +13,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // Carica sempre il .env dalla cartella del progetto (un livello sopra bin/)
 config({ path: join(__dirname, '..', '.env') });
 
+console.log('DEBUG PK:', process.env.HL_PRIVATE_KEY ? process.env.HL_PRIVATE_KEY.slice(0,10)+'...' : 'VUOTA');
+console.log('DEBUG ENV:', new URL('../.env', import.meta.url).pathname);
+
 import { createApp } from '../src/server.js';
 import open from 'open';
 import chalk from 'chalk';
