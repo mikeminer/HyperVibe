@@ -149,10 +149,9 @@ REM Controlla se Ollama e' installato
 ollama --version >nul 2>&1
 if %errorlevel% neq 0 goto INSTALL_OLLAMA
 
-REM gemma4 richiede >= 0.20 — controlla la versione
+REM gemma4 richiede >= 0.20 — controlla la versione con Node.js
 if "!FORCE_UPDATE_OLLAMA!"=="1" (
-    REM Estrai minor version: "ollama version is 0.20.2" -> cerca "0.2" o superiore
-    ollama --version 2>nul | findstr /r "0\.[2-9][0-9]\." >nul 2>&1
+    node -e "var v=require('child_process').execSync('ollama --version 2>&1').toString().match(/(\d+)\.(\d+)/);if(!v)process.exit(1);process.exit(parseInt(v[1])>0||parseInt(v[2])>=20?0:1);" >nul 2>&1
     if !errorlevel! equ 0 (
         echo  OK - Ollama gia' aggiornato, skip download
         goto OLLAMA_READY
