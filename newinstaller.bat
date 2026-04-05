@@ -11,7 +11,7 @@ set ENV_FILE=%APP_DIR%\.env
 
 echo.
 echo  ==========================================
-echo   HYPERVIBE - Installer v2.0
+echo   HYPERVIBE - Installer v2.1
 echo   Installing in: %INSTALL_DIR%
 echo  ==========================================
 echo.
@@ -133,6 +133,7 @@ goto OLLAMA_DONE
 set PROVIDER=ollama
 set OLLAMA_MODEL=qwen2.5:14b
 set FINAL_A=
+set CLAUDE_MODEL=
 echo.
 echo  Modalita': Ollama locale - Qwen 2.5 14B
 goto OLLAMA_SETUP
@@ -141,6 +142,7 @@ goto OLLAMA_SETUP
 set PROVIDER=ollama
 set OLLAMA_MODEL=gemma4:26b
 set FINAL_A=
+set CLAUDE_MODEL=
 echo.
 echo  Modalita': Ollama locale - Gemma 4 26B MoE
 echo  NOTA: Richiede Ollama >= v0.20.1 per il tool calling.
@@ -255,24 +257,38 @@ set /p NEW_TGC="      Valore (INVIO per saltare/mantenere): "
 if "!NEW_TGC!"=="" (set FINAL_TGC=!CUR_TG_CHAT!) else (set FINAL_TGC=!NEW_TGC!)
 echo.
 
-REM ── Scrivi .env ───────────────────────────────────────────────────────────────
-(
-    echo # HyperVibe Configuration - %DATE%
-    echo PROVIDER=!PROVIDER!
-    if not "!OLLAMA_MODEL!"=="" echo OLLAMA_MODEL=!OLLAMA_MODEL!
-    if not "!OLLAMA_MODEL!"=="" echo OLLAMA_BASE_URL=http://localhost:11434
-    if not "!FINAL_A!"==""     echo ANTHROPIC_API_KEY=!FINAL_A!
-    if not "!CLAUDE_MODEL!"=="" echo CLAUDE_MODEL=!CLAUDE_MODEL!
-    echo HL_WALLET_ADDRESS=!FINAL_W!
-    echo HL_PRIVATE_KEY=!FINAL_K!
-    echo HL_NETWORK=!FINAL_NET!
-    echo PORT=3001
-    echo.
-    echo # Telegram (opzionale)
-    echo TELEGRAM_BOT_TOKEN=!FINAL_TGT!
-    echo TELEGRAM_CHAT_ID=!FINAL_TGC!
-) > "%ENV_FILE%"
-echo  OK - .env salvato
+REM ── Scrivi .env tramite Node.js (evita bug batch con if dentro parentesi) ─────
+set HV_ENV_FILE=%ENV_FILE%
+set HV_PROVIDER=!PROVIDER!
+set HV_OLLAMA_MODEL=!OLLAMA_MODEL!
+set HV_CLAUDE_MODEL=!CLAUDE_MODEL!
+set HV_ANTHROPIC_KEY=!FINAL_A!
+set HV_WALLET=!FINAL_W!
+set HV_PK=!FINAL_K!
+set HV_NETWORK=!FINAL_NET!
+set HV_TG_TOKEN=!FINAL_TGT!
+set HV_TG_CHAT=!FINAL_TGC!
+
+node -e "
+const fs   = require('fs');
+const path = require('path');
+const e    = process.env;
+const lines = [];
+lines.push('# HyperVibe Configuration');
+lines.push('PROVIDER=' + e.HV_PROVIDER);
+if (e.HV_OLLAMA_MODEL)    lines.push('OLLAMA_MODEL=' + e.HV_OLLAMA_MODEL);
+if (e.HV_OLLAMA_MODEL)    lines.push('OLLAMA_BASE_URL=http://localhost:11434');
+if (e.HV_ANTHROPIC_KEY)   lines.push('ANTHROPIC_API_KEY=' + e.HV_ANTHROPIC_KEY);
+if (e.HV_CLAUDE_MODEL)    lines.push('CLAUDE_MODEL=' + e.HV_CLAUDE_MODEL);
+lines.push('HL_WALLET_ADDRESS=' + (e.HV_WALLET  || ''));
+lines.push('HL_PRIVATE_KEY='    + (e.HV_PK      || ''));
+lines.push('HL_NETWORK='        + (e.HV_NETWORK || 'mainnet'));
+lines.push('PORT=3001');
+lines.push('TELEGRAM_BOT_TOKEN=' + (e.HV_TG_TOKEN || ''));
+lines.push('TELEGRAM_CHAT_ID='   + (e.HV_TG_CHAT  || ''));
+fs.writeFileSync(e.HV_ENV_FILE, lines.join('\n') + '\n', 'utf8');
+console.log(' OK - .env salvato in ' + e.HV_ENV_FILE);
+"
 
 REM ── StartHyperVibe.bat ────────────────────────────────────────────────────────
 (
