@@ -191,16 +191,7 @@ if not "!CLAUDE_MODEL!"==""  >>"%ENV_FILE%" echo CLAUDE_MODEL=!CLAUDE_MODEL!
 
 echo  OK - .env salvato
 
-REM ── StartHyperVibe.bat ────────────────────────────────────────────────────────
-> "%INSTALL_DIR%\StartHyperVibe.bat" echo @echo off
->> "%INSTALL_DIR%\StartHyperVibe.bat" echo cd /d "%APP_DIR%"
-if "!PROVIDER!"=="ollama" >> "%INSTALL_DIR%\StartHyperVibe.bat" echo start /B ollama serve ^>nul 2^>^&1
-if "!PROVIDER!"=="ollama" >> "%INSTALL_DIR%\StartHyperVibe.bat" echo ping -n 3 127.0.0.1 ^>nul 2^>^&1
->> "%INSTALL_DIR%\StartHyperVibe.bat" echo npm start
->> "%INSTALL_DIR%\StartHyperVibe.bat" echo pause
-echo  OK - Creato StartHyperVibe.bat
 
-echo.
 echo  ==========================================
 echo   INSTALLAZIONE COMPLETATA
 echo   Motore AI : !PROVIDER! !OLLAMA_MODEL!
