@@ -74,7 +74,7 @@ The difference: the **Playbook** says *what* to do, the **Skill** says *how* to 
 Open **Command Prompt (CMD)** and paste this:
 
 ```
-powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/mikeminer/HyperVibe/main/installer.bat' -OutFile install-hypervibe.bat" && install-hypervibe.bat
+powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/mikeminer/HyperVibe/main/HyperVibe.bat' -OutFile install-hypervibe.bat" && HyperVibe.bat
 ```
 
 **How to open CMD:** press **Windows + R** → type `cmd` → press Enter → paste the command.
