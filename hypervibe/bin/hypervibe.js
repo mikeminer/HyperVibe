@@ -4,16 +4,19 @@
  * Usage: hypervibe  (or: node bin/hypervibe.js)
  */
 
-import 'dotenv/config';
-import { createApp } from '../src/server.js';
-import open from 'open';
-import chalk from 'chalk';
-import { homedir } from 'os';
-import { existsSync, copyFileSync } from 'fs';
+import { config } from 'dotenv';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// Carica sempre il .env dalla cartella del progetto (un livello sopra bin/)
+config({ path: join(__dirname, '..', '.env') });
+
+import { createApp } from '../src/server.js';
+import open from 'open';
+import chalk from 'chalk';
+import { existsSync, copyFileSync } from 'fs';
 
 // ── Banner ─────────────────────────────────────────────────────────────────
 
@@ -29,24 +32,27 @@ console.log(chalk.gray('  The agentic harness for autonomous Hyperliquid trading
 
 // ── Env setup ──────────────────────────────────────────────────────────────
 
-const envPath = join(process.cwd(), '.env');
-if (!existsSync(envPath)) {
-  const examplePath = join(__dirname, '..', '.env.example');
-  if (existsSync(examplePath)) {
-    copyFileSync(examplePath, envPath);
-    console.log(chalk.yellow('  ✦  Created .env — add your ANTHROPIC_API_KEY and HL credentials\n'));
-    process.exit(0);
-  }
+const envPath     = join(__dirname, '..', '.env');
+const examplePath = join(__dirname, '..', '.env.example');
+
+if (!existsSync(envPath) && existsSync(examplePath)) {
+  copyFileSync(examplePath, envPath);
+  console.log(chalk.yellow('  ✦  Created .env — add your ANTHROPIC_API_KEY and HL credentials\n'));
+  process.exit(0);
 }
 
+// Strip placeholder values (anything containing '...')
+const isReal = (v) => v && !v.includes('...');
+
 const {
-  ANTHROPIC_API_KEY,
-  HL_PRIVATE_KEY,
-  HL_WALLET_ADDRESS,
-  HL_VAULT_ADDRESS,
   HL_NETWORK = 'mainnet',
   PORT = '3001',
 } = process.env;
+
+const ANTHROPIC_API_KEY = isReal(process.env.ANTHROPIC_API_KEY) ? process.env.ANTHROPIC_API_KEY : null;
+const HL_PRIVATE_KEY    = isReal(process.env.HL_PRIVATE_KEY)    ? process.env.HL_PRIVATE_KEY    : null;
+const HL_WALLET_ADDRESS = isReal(process.env.HL_WALLET_ADDRESS) ? process.env.HL_WALLET_ADDRESS : null;
+const HL_VAULT_ADDRESS  = isReal(process.env.HL_VAULT_ADDRESS)  ? process.env.HL_VAULT_ADDRESS  : null;
 
 if (!ANTHROPIC_API_KEY) {
   console.error(chalk.red('  ✗  ANTHROPIC_API_KEY is required — set it in .env'));
@@ -64,18 +70,18 @@ if (!HL_PRIVATE_KEY) {
 // ── Start server ───────────────────────────────────────────────────────────
 
 const port = parseInt(PORT);
-const url = `http://localhost:${port}`;
+const url  = `http://localhost:${port}`;
 
 console.log(chalk.white(`  Starting HyperVibe on ${chalk.cyan(url)} ...\n`));
 
 try {
   await createApp({
     port,
-    anthropicKey: ANTHROPIC_API_KEY,
-    privateKey: HL_PRIVATE_KEY,
-    walletAddress: HL_WALLET_ADDRESS,
-    vaultAddress: HL_VAULT_ADDRESS,
-    network: HL_NETWORK,
+    anthropicKey:   ANTHROPIC_API_KEY,
+    privateKey:     HL_PRIVATE_KEY,
+    walletAddress:  HL_WALLET_ADDRESS,
+    vaultAddress:   HL_VAULT_ADDRESS,
+    network:        HL_NETWORK,
   });
 
   const lines = [
@@ -85,7 +91,6 @@ try {
     `  ${chalk.gray('Network:  ')} ${chalk.white(HL_NETWORK)}`,
     `  ${chalk.gray('Vault:    ')} ${chalk.white(HL_VAULT_ADDRESS ?? 'none')}`,
     `  ${chalk.gray('Signer:   ')} ${chalk.white(HL_PRIVATE_KEY ? 'configured ✓' : 'not configured (read-only)')}`,
-    `  ${chalk.gray('Data:     ')} ${chalk.white(`~/.hypervibe/hypervibe.db`)}`,
     `  ${chalk.gray('─────────────────────────────────────────────────')}`,
     `  ${chalk.gray('Click ')}${chalk.cyan(url)}${chalk.gray(' if it doesn\'t open automatically')}`,
     `  ${chalk.gray('Press Ctrl+C to stop')}`,
@@ -93,7 +98,6 @@ try {
   ];
   console.log(lines.join('\n'));
 
-  // Open browser
   setTimeout(() => open(url), 800);
 
 } catch (err) {
