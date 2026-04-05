@@ -76,7 +76,7 @@ La differenza: il **Playbook** dice *cosa* fare, la **Skill** dice *come* farlo.
 Apri il **Prompt dei comandi (CMD)** e incolla questo:
 
 ```
-powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/mikeminer/HyperVibe/main/installer.bat' -OutFile install-hypervibe.bat" && install-hypervibe.bat
+powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/mikeminer/HyperVibe/main/installer.bat' -OutFile HyperVibe.bat" && HyperVibe.bat
 ```
 
 **Come aprire il CMD:** premi **Windows + R** → scrivi `cmd` → premi Invio → incolla il comando.
