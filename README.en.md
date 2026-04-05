@@ -114,7 +114,7 @@ The installer does everything automatically:
 
 Your browser opens at **http://localhost:3001**
 
-To restart HyperVibe: double-click **StartHyperVibe.bat** in the same folder as the installer.
+To restart HyperVibe: double-click **HyperVibe.bat** in the same folder as the installer.
 
 ---
 
