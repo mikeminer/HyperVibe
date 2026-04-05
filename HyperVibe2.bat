@@ -149,9 +149,10 @@ REM Controlla se Ollama e' installato
 ollama --version >nul 2>&1
 if %errorlevel% neq 0 goto INSTALL_OLLAMA
 
-REM gemma4 richiede >= 0.20 — controlla la versione con Node.js
+REM gemma4 richiede >= 0.20 — controlla la versione
 if "!FORCE_UPDATE_OLLAMA!"=="1" (
-    node -e "var v=require('child_process').execSync('ollama --version 2>&1').toString().match(/(\d+)\.(\d+)/);if(!v)process.exit(1);process.exit(parseInt(v[1])>0||parseInt(v[2])>=20?0:1);" >nul 2>&1
+    ollama --version > "%TMP_DIR%\olv.txt" 2>&1
+    node -e "var s=require('fs').readFileSync(process.env.TEMP+'\\hypervibe_install\\olv.txt','utf8');var m=s.match(/(\d+)\.(\d+)/);process.exit(!m||parseInt(m[2])<20?1:0);" >nul 2>&1
     if !errorlevel! equ 0 (
         echo  OK - Ollama gia' aggiornato, skip download
         goto OLLAMA_READY
