@@ -1,4 +1,4 @@
-# HyperVibe 🚀
+# HyperVibe 🚀 If you want to support the project please donate 0x5d69c42a3a481d0ccfd88cfa8a2a08e2bf456134
 
 **HyperVibe is an AI agent that trades autonomously on Hyperliquid on your behalf.**
 
