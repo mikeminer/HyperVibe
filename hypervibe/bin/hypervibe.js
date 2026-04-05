@@ -35,11 +35,7 @@ console.log(chalk.gray('  The agentic harness for autonomous Hyperliquid trading
 const envPath     = join(__dirname, '..', '.env');
 const examplePath = join(__dirname, '..', '.env.example');
 
-if (!existsSync(envPath) && existsSync(examplePath)) {
-  copyFileSync(examplePath, envPath);
-  console.log(chalk.yellow('  ✦  Created .env — add your ANTHROPIC_API_KEY and HL credentials\n'));
-  process.exit(0);
-}
+
 
 // Strip placeholder values (anything containing '...')
 const isReal = (v) => v && !v.includes('...');
