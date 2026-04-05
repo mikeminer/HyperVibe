@@ -144,13 +144,10 @@ echo  Verifica Ollama...
 ollama --version >nul 2>&1
 if %errorlevel% neq 0 goto INSTALL_OLLAMA
 
-REM Ollama presente — se serve gemma4 verifica compatibilita'
+REM Ollama presente — gemma4 richiede versione recente, aggiorna sempre
 if "!OLLAMA_MODEL!"=="gemma4:27b" (
-    ollama pull gemma4:27b 2>&1 | findstr /i "newer version" >nul 2>&1
-    if !errorlevel! equ 0 (
-        echo  Versione Ollama troppo vecchia per gemma4 — aggiornamento...
-        goto INSTALL_OLLAMA
-    )
+    echo  gemma4 richiede Ollama aggiornato — aggiornamento in corso...
+    goto INSTALL_OLLAMA
 )
 goto OLLAMA_READY
 
