@@ -1,6 +1,6 @@
 @echo off
 setlocal EnableDelayedExpansion
-title HyperVibe Installer v3.0
+title HyperVibe Installer v3.1
 chcp 437 >nul
 
 set INSTALL_DIR=%~dp0
@@ -12,7 +12,7 @@ set TMP_DIR=%TEMP%\hypervibe_install
 
 echo.
 echo  ==========================================
-echo   HYPERVIBE - Installer v3.0
+echo   HYPERVIBE - Installer v3.1
 echo   Cartella: %INSTALL_DIR%
 echo  ==========================================
 echo.
@@ -24,7 +24,6 @@ echo [1/6] Node.js...
 node --version >nul 2>&1
 if %errorlevel% equ 0 goto NODE_OK
 
-REM Prova winget (Windows 10 aggiornato / Windows 11)
 winget --version >nul 2>&1
 if %errorlevel% equ 0 (
     echo  Installazione via winget...
@@ -34,7 +33,6 @@ if %errorlevel% equ 0 (
     if %errorlevel% equ 0 goto NODE_OK
 )
 
-REM Fallback: scarica MSI silenzioso
 echo  Download Node.js...
 curl -L --progress-bar -o "%TMP_DIR%\node-lts.msi" "https://nodejs.org/dist/v22.14.0/node-v22.14.0-x64.msi"
 if %errorlevel% neq 0 ( echo  ERRORE: Download Node.js fallito. & pause & exit /b 1 )
@@ -116,6 +114,7 @@ goto ASK_AI
 set PROVIDER=anthropic
 set OLLAMA_MODEL=
 set CLAUDE_MODEL=claude-sonnet-4-20250514
+set NEED_OLLAMA=0
 set CUR_ANTHROPIC=
 if exist "%ENV_FILE%" for /f "usebackq tokens=1,* delims==" %%a in ("%ENV_FILE%") do if "%%a"=="ANTHROPIC_API_KEY" set CUR_ANTHROPIC=%%b
 echo.
@@ -127,6 +126,8 @@ goto STEP6
 :AI_QWEN
 set PROVIDER=ollama
 set OLLAMA_MODEL=qwen2.5:14b
+set NEED_OLLAMA=1
+set FORCE_UPDATE_OLLAMA=0
 set FINAL_A=
 set CLAUDE_MODEL=
 goto OLLAMA_SETUP
@@ -134,30 +135,34 @@ goto OLLAMA_SETUP
 :AI_GEMMA
 set PROVIDER=ollama
 set OLLAMA_MODEL=gemma4:27b
+set NEED_OLLAMA=1
+set FORCE_UPDATE_OLLAMA=1
 set FINAL_A=
 set CLAUDE_MODEL=
 
-REM ── Ollama: installa o aggiorna automaticamente ───────────────────────────────
+REM ── Ollama ───────────────────────────────────────────────────────────────────
 :OLLAMA_SETUP
 echo.
 echo  Verifica Ollama...
-ollama --version >nul 2>&1
-if %errorlevel% neq 0 goto INSTALL_OLLAMA
 
-REM Ollama presente — gemma4 richiede versione recente, aggiorna sempre
-if "!OLLAMA_MODEL!"=="gemma4:27b" (
-    echo  gemma4 richiede Ollama aggiornato — aggiornamento in corso...
+REM gemma4 richiede versione recente: aggiorna sempre
+if "!FORCE_UPDATE_OLLAMA!"=="1" (
+    echo  gemma4 richiede Ollama aggiornato - aggiornamento in corso...
     goto INSTALL_OLLAMA
 )
-goto OLLAMA_READY
+
+REM qwen: basta che Ollama esista
+ollama --version >nul 2>&1
+if %errorlevel% equ 0 goto OLLAMA_READY
 
 :INSTALL_OLLAMA
 echo  Download Ollama...
 curl -L --progress-bar -o "%TMP_DIR%\OllamaSetup.exe" "https://ollama.com/download/OllamaSetup.exe"
 if %errorlevel% neq 0 ( echo  ERRORE: Download Ollama fallito. & pause & exit /b 1 )
-echo  Installazione Ollama (silenziosa)...
+echo  Installazione Ollama...
 "%TMP_DIR%\OllamaSetup.exe" /S
-ping -n 8 127.0.0.1 >nul 2>&1
+echo  Attendo avvio servizio...
+ping -n 10 127.0.0.1 >nul 2>&1
 set "PATH=%LOCALAPPDATA%\Programs\Ollama;%PATH%"
 ollama --version >nul 2>&1
 if %errorlevel% neq 0 ( echo  ERRORE: Ollama non installato. & pause & exit /b 1 )
