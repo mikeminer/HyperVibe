@@ -100,7 +100,7 @@ echo [5/6] Motore AI...
 echo.
 echo   [1] Anthropic API   - Claude cloud, a pagamento, qualita' massima
 echo   [2] Qwen 2.5 14B    - Locale, gratuito, ~9GB RAM  (consigliato)
-echo   [3] Gemma 4 27B MoE - Locale, gratuito, ~20GB RAM
+echo   [3] Gemma 4 26B MoE - Locale, gratuito, ~20GB RAM
 echo.
 set AI_CHOICE=
 :ASK_AI
@@ -134,7 +134,7 @@ goto OLLAMA_SETUP
 
 :AI_GEMMA
 set PROVIDER=ollama
-set OLLAMA_MODEL=gemma4:27b
+set OLLAMA_MODEL=gemma4:26b
 set NEED_OLLAMA=1
 set FORCE_UPDATE_OLLAMA=1
 set FINAL_A=
