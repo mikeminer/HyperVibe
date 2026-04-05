@@ -116,7 +116,7 @@ Il programma fa tutto da solo:
 
 Il browser si apre su **http://localhost:3001**
 
-Per riavviare HyperVibe: doppio click su **StartHyperVibe.bat** nella stessa cartella dell'installer.
+Per riavviare HyperVibe: doppio click su **HyperVibe.bat** nella stessa cartella dell'installer.
 
 ---
 
