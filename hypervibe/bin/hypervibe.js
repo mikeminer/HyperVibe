@@ -21,24 +21,22 @@ import open from 'open';
 import chalk from 'chalk';
 import { existsSync, copyFileSync } from 'fs';
 
-// ── Banner ─────────────────────────────────────────────────────────────────
+// ── Banner ────────────────────────────────────────────────────────────────────
 
 console.log(chalk.cyan(`
   ██╗  ██╗██╗   ██╗██████╗ ███████╗██████╗ ██╗   ██╗██╗██████╗ ███████╗
   ██║  ██║╚██╗ ██╔╝██╔══██╗██╔════╝██╔══██╗██║   ██║██║██╔══██╗██╔════╝
-  ███████║ ╚████╔╝ ██████╔╝█████╗  ██████╔╝██║   ██║██║██████╔╝█████╗  
-  ██╔══██║  ╚██╔╝  ██╔═══╝ ██╔══╝  ██╔══██╗╚██╗ ██╔╝██║██╔══██╗██╔══╝  
+  ███████║ ╚████╔╝ ██████╔╝█████╗  ██████╔╝██║   ██║██║██████╔╝█████╗
+  ██╔══██║  ╚██╔╝  ██╔═══╝ ██╔══╝  ██╔══██╗╚██╗ ██╔╝██║██╔══██╗██╔══╝
   ██║  ██║   ██║   ██║     ███████╗██║  ██║ ╚████╔╝ ██║██████╔╝███████╗
   ╚═╝  ╚═╝   ╚═╝   ╚═╝     ╚══════╝╚═╝  ╚═╝  ╚═══╝  ╚═╝╚═════╝ ╚══════╝
 `));
 console.log(chalk.gray('  The agentic harness for autonomous Hyperliquid trading\n'));
 
-// ── Env setup ──────────────────────────────────────────────────────────────
+// ── Env setup ─────────────────────────────────────────────────────────────────
 
 const envPath     = join(__dirname, '..', '.env');
 const examplePath = join(__dirname, '..', '.env.example');
-
-
 
 // Strip placeholder values (anything containing '...')
 const isReal = (v) => v && !v.includes('...');
@@ -48,14 +46,29 @@ const {
   PORT = '3001',
 } = process.env;
 
+// ── Provider selection ────────────────────────────────────────────────────────
+
+const PROVIDER = (process.env.PROVIDER || 'anthropic').toLowerCase();
+
 const ANTHROPIC_API_KEY = isReal(process.env.ANTHROPIC_API_KEY) ? process.env.ANTHROPIC_API_KEY : null;
 const HL_PRIVATE_KEY    = isReal(process.env.HL_PRIVATE_KEY)    ? process.env.HL_PRIVATE_KEY    : null;
 const HL_WALLET_ADDRESS = isReal(process.env.HL_WALLET_ADDRESS) ? process.env.HL_WALLET_ADDRESS : null;
 const HL_VAULT_ADDRESS  = isReal(process.env.HL_VAULT_ADDRESS)  ? process.env.HL_VAULT_ADDRESS  : null;
 
-if (!ANTHROPIC_API_KEY) {
+// Validazione chiave AI — solo se il provider lo richiede
+if (PROVIDER === 'anthropic' && !ANTHROPIC_API_KEY) {
   console.error(chalk.red('  ✗  ANTHROPIC_API_KEY is required — set it in .env'));
   process.exit(1);
+}
+
+if (PROVIDER === 'ollama') {
+  const ollamaModel = process.env.OLLAMA_MODEL;
+  if (!ollamaModel) {
+    console.error(chalk.red('  ✗  OLLAMA_MODEL is required — set it in .env (es: gemma4:26b)'));
+    process.exit(1);
+  }
+  const ollamaBase = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+  console.log(chalk.gray(`  Provider: Ollama · Model: ${ollamaModel} · Base: ${ollamaBase}\n`));
 }
 
 if (!HL_WALLET_ADDRESS) {
@@ -66,7 +79,7 @@ if (!HL_PRIVATE_KEY) {
   console.warn(chalk.yellow('  ⚠  HL_PRIVATE_KEY not set — approvals will fail (read-only mode)'));
 }
 
-// ── Start server ───────────────────────────────────────────────────────────
+// ── Start server ──────────────────────────────────────────────────────────────
 
 const port = parseInt(PORT);
 const url  = `http://localhost:${port}`;
@@ -84,13 +97,14 @@ try {
   });
 
   const lines = [
-    `  ${chalk.green('✓')} HyperVibe running at ${chalk.cyan(url)}`,
-    `  ${chalk.gray('─────────────────────────────────────────────────')}`,
+    `  ${chalk.green('✔')} HyperVibe running at ${chalk.cyan(url)}`,
+    `  ${chalk.gray('─'.repeat(49))}`,
+    `  ${chalk.gray('Provider: ')} ${chalk.white(PROVIDER)}`,
     `  ${chalk.gray('Wallet:   ')} ${chalk.white(HL_WALLET_ADDRESS ?? 'not configured')}`,
     `  ${chalk.gray('Network:  ')} ${chalk.white(HL_NETWORK)}`,
     `  ${chalk.gray('Vault:    ')} ${chalk.white(HL_VAULT_ADDRESS ?? 'none')}`,
-    `  ${chalk.gray('Signer:   ')} ${chalk.white(HL_PRIVATE_KEY ? 'configured ✓' : 'not configured (read-only)')}`,
-    `  ${chalk.gray('─────────────────────────────────────────────────')}`,
+    `  ${chalk.gray('Signer:   ')} ${chalk.white(HL_PRIVATE_KEY ? 'configured ✔' : 'not configured (read-only)')}`,
+    `  ${chalk.gray('─'.repeat(49))}`,
     `  ${chalk.gray('Click ')}${chalk.cyan(url)}${chalk.gray(' if it doesn\'t open automatically')}`,
     `  ${chalk.gray('Press Ctrl+C to stop')}`,
     '',
