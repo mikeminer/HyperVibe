@@ -145,15 +145,24 @@ REM ── Ollama ────────────────────�
 echo.
 echo  Verifica Ollama...
 
-REM gemma4 richiede versione recente: aggiorna sempre
+REM Controlla se Ollama e' installato
+ollama --version >nul 2>&1
+if %errorlevel% neq 0 goto INSTALL_OLLAMA
+
+REM gemma4 richiede >= 0.20 — controlla la versione
 if "!FORCE_UPDATE_OLLAMA!"=="1" (
-    echo  gemma4 richiede Ollama aggiornato - aggiornamento in corso...
+    REM Estrai minor version: "ollama version is 0.20.2" -> cerca "0.2" o superiore
+    ollama --version 2>nul | findstr /r "0\.[2-9][0-9]\." >nul 2>&1
+    if !errorlevel! equ 0 (
+        echo  OK - Ollama gia' aggiornato, skip download
+        goto OLLAMA_READY
+    )
+    echo  Ollama troppo vecchio per gemma4 - aggiornamento in corso...
     goto INSTALL_OLLAMA
 )
 
-REM qwen: basta che Ollama esista
-ollama --version >nul 2>&1
-if %errorlevel% equ 0 goto OLLAMA_READY
+REM qwen e altri: basta che Ollama esista
+goto OLLAMA_READY
 
 :INSTALL_OLLAMA
 echo  Download Ollama...
