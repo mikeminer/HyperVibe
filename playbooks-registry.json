@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "updated": "2026-03-29",
+  "updated": "2026-04-07",
   "playbooks": [
     {
       "id": "hype-momentum-scalp",
@@ -58,15 +58,34 @@
       "previewUrl": "https://github.com/mikeminer/HyperVibe/blob/main/playbooks/top-mover-breakout.md"
     },
     {
-  "id": "hype-fee-monitor-burn-predictor",
-  "name": "HYPE Fee Monitor & Burn Predictor",
-  "description": "Monitors Hyperliquid Assistance Fund fees every 30 minutes via onchain + API. Calculates HYPE buyback/burn rate, order book imbalance, and estimates HYPE price at T+1h, T+4h, T+24h using a calibrated elasticity model. Generates BOUNCE_HIGH / BURN_SPIKE / FEE_DROP signals. Signal-only engine — no autonomous entries.",
-  "author": "pappardelle.eth",
-  "version": "1.0.0",
-  "allocation": 0,
-  "tags": ["hype", "fee-monitor", "burn", "buyback", "signal-engine", "onchain", "price-prediction", "hyperevm"],
-  "url": "https://raw.githubusercontent.com/mikeminer/HyperVibe/main/playbooks/hypePricePrediction.md",
-  "previewUrl": "https://github.com/mikeminer/HyperVibe/blob/main/playbooks/hypePricePrediction.md"
-}
+      "id": "hype-fee-monitor-burn-predictor",
+      "name": "HYPE Fee Monitor & Burn Predictor",
+      "description": "Monitors Hyperliquid Assistance Fund fees every 30 minutes via onchain + API. Calculates HYPE buyback/burn rate, order book imbalance, and estimates HYPE price at T+1h, T+4h, T+24h using a calibrated elasticity model. Generates BOUNCE_HIGH / BURN_SPIKE / FEE_DROP signals. Signal-only engine — no autonomous entries.",
+      "author": "pappardelle.eth",
+      "version": "1.0.0",
+      "allocation": 0,
+      "tags": ["hype", "fee-monitor", "burn", "buyback", "signal-engine", "onchain", "price-prediction", "hyperevm"],
+      "url": "https://raw.githubusercontent.com/mikeminer/HyperVibe/main/playbooks/hypePricePrediction.md",
+      "previewUrl": "https://github.com/mikeminer/HyperVibe/blob/main/playbooks/hypePricePrediction.md"
+    },
+    {
+      "id": "autotrade-research",
+      "name": "Autotrade Strategy Research",
+      "description": "Pipeline di ricerca autonoma: Claude Code itera su strategie, backtesta su dati Hyperliquid reali (qualsiasi coin perp), seleziona la migliore e propone l'esecuzione live con SL/TP automatici. Richiede autotrade clonato in hypervibe/tools/autotrade/.",
+      "author": "pappardelle.eth",
+      "version": "1.0.0",
+      "allocation": 25,
+      "tags": ["research", "backtest", "autonomous", "multi-coin", "autotrade", "signal-engine"],
+      "url": "https://raw.githubusercontent.com/mikeminer/HyperVibe/main/playbooks/autotrade-research.md",
+      "previewUrl": "https://github.com/mikeminer/HyperVibe/blob/main/playbooks/autotrade-research.md",
+      "requires": {
+        "tools": [
+          "hypervibe/tools/autotrade/autotrade-bridge.js",
+          "hypervibe/tools/autotrade/signal-loader.js"
+        ],
+        "npm": ["@nktkas/hyperliquid", "ethers"],
+        "external": ["claude-code-cli", "autotrade (rv64m/autotrade)"]
+      }
+    }
   ]
 }
