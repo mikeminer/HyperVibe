@@ -124,22 +124,20 @@ echo  OK - autotrade submodule inizializzato
 REM Crea package.json per tools/autotrade se non esiste
 if not exist "%TOOLS_DIR%\package.json" (
     echo  Inizializzazione package.json tools...
-    >"%TOOLS_DIR%\package.json" echo {
-    >>"%TOOLS_DIR%\package.json" echo   "name": "hypervibe-autotrade-tools",
-    >>"%TOOLS_DIR%\package.json" echo   "version": "1.0.0",
-    >>"%TOOLS_DIR%\package.json" echo   "type": "module",
-    >>"%TOOLS_DIR%\package.json" echo   "description": "Autotrade bridge and signal loader for HyperVibe",
-    >>"%TOOLS_DIR%\package.json" echo   "dependencies": {
-    >>"%TOOLS_DIR%\package.json" echo     "@nktkas/hyperliquid": "^0.11.0",
-    >>"%TOOLS_DIR%\package.json" echo     "ethers": "^6.13.0"
-    >>"%TOOLS_DIR%\package.json" echo   }
-    >>"%TOOLS_DIR%\package.json" echo }
+    (
+        echo {
+        echo   "name": "hypervibe-autotrade-tools",
+        echo   "version": "1.0.0",
+        echo   "type": "module",
+        echo   "description": "Autotrade bridge and signal loader for HyperVibe"
+        echo }
+    ) > "%TOOLS_DIR%\package.json"
 )
 
-REM Installa dipendenze Hyperliquid + ethers
+REM Installa dipendenze con versioni latest — evita problemi di versione inesistente
 echo  Installazione @nktkas/hyperliquid ed ethers...
 cd /d "%TOOLS_DIR%"
-call npm install --silent
+call npm install @nktkas/hyperliquid@latest ethers@latest --silent
 if %errorlevel% neq 0 (
     echo  ERRORE: npm install tools fallito. Continuo senza modulo.
     goto STEP5
@@ -153,9 +151,8 @@ if not exist "%TOOLS_DIR%\signal-loader.js"    set MISSING_SCRIPTS=1
 
 if "!MISSING_SCRIPTS!"=="1" (
     echo.
-    echo  ATTENZIONE: autotrade-bridge.js e signal-loader.js non trovati in:
+    echo  ATTENZIONE: autotrade-bridge.js e/o signal-loader.js non trovati in:
     echo   %TOOLS_DIR%
-    echo.
     echo  Copiali manualmente da:
     echo   https://github.com/mikeminer/HyperVibe/tree/main/hypervibe/tools/autotrade/
     echo.
@@ -342,7 +339,6 @@ if not "!CLAUDE_MODEL!"==""  >>"%ENV_FILE%" echo CLAUDE_MODEL=!CLAUDE_MODEL!
 >>"%ENV_FILE%" echo TELEGRAM_BOT_TOKEN=!FINAL_TGT!
 >>"%ENV_FILE%" echo TELEGRAM_CHAT_ID=!FINAL_TGC!
 
-REM Aggiunge path autotrade al .env se installato
 if "!INSTALL_AUTOTRADE_OK!"=="1" (
     >>"%ENV_FILE%" echo AUTOTRADE_DIR=!TOOLS_DIR!\autotrade
     >>"%ENV_FILE%" echo SIGNALS_DIR=!APP_DIR!\playbooks\signals
