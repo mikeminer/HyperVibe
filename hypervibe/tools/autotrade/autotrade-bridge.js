@@ -168,6 +168,7 @@ export function runAutotrade(params, autotradeDir) {
     const child = spawn(cmd[0], cmd.slice(1), {
       cwd: autotradeDir,
       stdio: ["ignore", "pipe", "pipe"],
+      shell: true,
     });
 
     child.stdout.on("data", (d) => {

@@ -8,6 +8,14 @@ import { Permissions } from '../primitives/permissions.js';
 import { Playbooks } from '../primitives/playbooks.js';
 import { Triggers, scheduleCronTrigger } from '../primitives/triggers.js';
 import { Learnings } from '../primitives/learnings.js';
+import { spawn } from 'child_process';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename_tools  = fileURLToPath(import.meta.url);
+const __dirname_tools   = path.dirname(__filename_tools);
+const AUTOTRADE_BRIDGE  = path.join(__dirname_tools, '..', '..', 'tools', 'autotrade', 'autotrade-bridge.js');
+const SIGNALS_DIR       = path.join(__dirname_tools, '..', '..', 'playbooks', 'signals');
 
 // ── Hyperliquid onchain helpers ───────────────────────────────────────────────
 
@@ -36,26 +44,11 @@ async function hlPost(body) {
 }
 
 // ── toolGetHypeFees ───────────────────────────────────────────────────────────
-//
-// Two data sources combined:
-//
-// 1. VOLUME-BASED ESTIMATE (primary — always available)
-//    Uses dayNtlVlm from metaAndAssetCtxs to estimate USDC flowing into the
-//    Assistance Fund. Fee rate ~0.025% weighted avg. Fund receives ~40%.
-//
-// 2. BALANCE DELTA (secondary — real onchain signal)
-//    eth_getBalance at two blocks gives net HYPE change in the fund.
-//    HYPE on HyperEVM uses 18 decimals (standard EVM native token).
-//    Negative delta = more HYPE burned than received = burn pressure.
-//    Note: L1-level burns may not always reflect in EVM balance — proxy only.
-//
-// eth_getLogs is NOT used: without address filter it returns all Transfer
-// events across all contracts in the range and times out reliably.
 
 async function toolGetHypeFees({ minutes = 30 } = {}) {
   const currentBlockHex = await hlRpc('eth_blockNumber', []);
   const currentBlock    = parseInt(currentBlockHex, 16);
-  const blocksBack      = Math.floor((minutes * 60) / 2); // ~2s/block on HyperEVM
+  const blocksBack      = Math.floor((minutes * 60) / 2);
   const startBlock      = Math.max(0, currentBlock - blocksBack);
 
   const [meta, mids, balNow, balThen] = await Promise.all([
@@ -65,7 +58,6 @@ async function toolGetHypeFees({ minutes = 30 } = {}) {
     hlRpc('eth_getBalance', [ASSISTANCE_FUND, '0x' + startBlock.toString(16)]),
   ]);
 
-  // ── 1. Volume-based fee estimate ────────────────────────────────────────────
   const universe   = meta[0]?.universe ?? [];
   const ctxs       = meta[1] ?? [];
   const hype_price = parseFloat(mids['HYPE'] || 0);
@@ -82,26 +74,22 @@ async function toolGetHypeFees({ minutes = 30 } = {}) {
 
   const window_fraction   = minutes / (24 * 60);
   const vlm_window        = total_24h_vlm * window_fraction;
-  const FEE_RATE          = 0.00025;  // ~0.025% weighted avg
-  const FUND_SHARE        = 0.40;     // ~40% of protocol fees to Assistance Fund
+  const FEE_RATE          = 0.00025;
+  const FUND_SHARE        = 0.40;
   const usdc_inflow       = vlm_window * FEE_RATE * FUND_SHARE;
   const fee_rate_per_hour = (total_24h_vlm * FEE_RATE * FUND_SHARE) / 24;
   const hype_bought_est   = hype_price > 0 ? (usdc_inflow / hype_price) * 0.85 : 0;
   const hype_burned_est   = hype_bought_est * 0.80;
 
-  // ── 2. Balance delta — real onchain signal ──────────────────────────────────
-  // HYPE native token on HyperEVM = 18 decimals
   const balNowHype          = parseInt(balNow,  16) / 1e18;
   const balThenHype         = parseInt(balThen, 16) / 1e18;
   const hype_delta          = balNowHype - balThenHype;
   const hype_burned_onchain = hype_delta < 0 ? Math.abs(hype_delta) : 0;
   const hype_accumulated    = hype_delta > 0 ? hype_delta : 0;
 
-  // ── Composite: prefer onchain if non-zero, else use estimate ───────────────
   const hype_burned = hype_burned_onchain > 0 ? hype_burned_onchain : hype_burned_est;
   const hype_bought = hype_burned_onchain > 0 ? hype_burned_onchain / 0.80 : hype_bought_est;
 
-  // Burn signal strength vs expected baseline (0 = at baseline, >1 = above)
   const burn_signal_strength = hype_burned_est > 0
     ? Math.min(hype_burned / hype_burned_est, 5)
     : 0;
@@ -111,23 +99,19 @@ async function toolGetHypeFees({ minutes = 30 } = {}) {
     period_minutes:        minutes,
     block_start:           startBlock,
     block_end:             currentBlock,
-    // Volume-based
     total_24h_volume:      Math.round(total_24h_vlm),
     hype_24h_volume:       Math.round(hype_24h_vlm),
     volume_in_window:      Math.round(vlm_window),
     usdc_inflow:           parseFloat(usdc_inflow.toFixed(2)),
     fee_rate_per_hour:     parseFloat(fee_rate_per_hour.toFixed(2)),
-    // Onchain balance delta
     hype_balance_now:      parseFloat(balNowHype.toFixed(6)),
     hype_balance_then:     parseFloat(balThenHype.toFixed(6)),
     hype_delta:            parseFloat(hype_delta.toFixed(6)),
     hype_burned_onchain:   parseFloat(hype_burned_onchain.toFixed(6)),
     hype_accumulated:      parseFloat(hype_accumulated.toFixed(6)),
-    // Composite (used by signal classifier)
     hype_burned:           parseFloat(hype_burned.toFixed(6)),
     hype_bought:           parseFloat(hype_bought.toFixed(6)),
     burn_signal_strength:  parseFloat(burn_signal_strength.toFixed(3)),
-    // HYPE market context
     hype_price,
     hype_oi:               parseFloat(hype_ctx.openInterest ?? 0),
     hype_funding:          parseFloat(hype_ctx.funding ?? 0),
@@ -149,7 +133,6 @@ async function toolGetHypeOrderbook({ coin = 'HYPE', depth_pct = 5 } = {}) {
     return { ok: true, coin, mid_price: mid, book_imbalance: null, imbalance_label: 'unavailable', partial: true };
   }
 
-  // levels[0] = flat array of bid objects {px, sz, n} — NOT nested
   const bids = Array.isArray(data.levels[0]) ? data.levels[0] : [];
   const asks = Array.isArray(data.levels[1]) ? data.levels[1] : [];
 
@@ -195,7 +178,6 @@ async function toolGetHypeSignal({ minutes = 30 } = {}) {
 
   const imbalance = book.ok ? book.book_imbalance : null;
 
-  // Signal classification
   let signal = 'NEUTRAL';
   if (fees.burn_signal_strength > 2) {
     signal = 'BURN_SPIKE';
@@ -204,10 +186,8 @@ async function toolGetHypeSignal({ minutes = 30 } = {}) {
     else if (imbalance !== null && imbalance > 0.05)  signal = 'BOUNCE_MED';
     else if (imbalance !== null && imbalance < -0.15) signal = 'FEE_DROP';
   }
-  // Upgrade BOUNCE_MED if burn is elevated
   if (signal === 'BOUNCE_MED' && fees.burn_signal_strength > 1.5) signal = 'BOUNCE_HIGH';
 
-  // Price impact model
   const CIRCULATING = 333_000_000;
   const ELASTICITY  = 2.5;
   const supply_1h   = fees.hype_price > 0 && fees.hype_burned > 0
@@ -230,7 +210,94 @@ async function toolGetHypeSignal({ minutes = 30 } = {}) {
   };
 }
 
-// ── Tool definitions ───────────────────────────────────────────────────────────
+// ── toolRunAutotradeResearch ──────────────────────────────────────────────────
+
+async function toolRunAutotradeResearch({ coin = 'HYPE', timeframe = '1h', iterations = 20, min_pf = 1.2, max_drawdown = -25, max_leverage = 3 } = {}) {
+  const { mkdir } = await import('fs/promises');
+  const { createWriteStream } = await import('fs');
+
+  await mkdir(SIGNALS_DIR, { recursive: true }).catch(() => {});
+
+  const args = [
+    AUTOTRADE_BRIDGE, 'run',
+    '--coin',         coin,
+    '--timeframe',    timeframe,
+    '--iterations',   String(iterations),
+    '--min-pf',       String(min_pf),
+    '--max-drawdown', String(max_drawdown),
+    '--max-leverage', String(max_leverage),
+    '--out',          SIGNALS_DIR,
+  ];
+
+  const logFile   = path.join(SIGNALS_DIR, `run_${coin.toLowerCase()}_${Date.now()}.log`);
+  const logStream = createWriteStream(logFile, { flags: 'a' });
+
+  const child = spawn('node', args, {
+    shell:    true,
+    detached: true,
+    stdio:    ['ignore', 'pipe', 'pipe'],
+  });
+
+  child.stdout.pipe(logStream);
+  child.stderr.pipe(logStream);
+  child.unref();
+
+  const estimatedMinutes = Math.round(20 + iterations * 1.5);
+
+  return {
+    status:            'started',
+    coin,
+    symbol:            `${coin.toUpperCase()}/USDC:USDC`,
+    timeframe,
+    iterations,
+    pid:               child.pid,
+    log_file:          logFile,
+    signals_dir:       SIGNALS_DIR,
+    estimated_minutes: estimatedMinutes,
+    message:           `Ricerca avviata su ${coin} (${timeframe}, ${iterations} iterazioni). Tempo stimato: ~${estimatedMinutes} minuti. Quando completa, chiama load_autotrade_signal per vedere il risultato.`,
+  };
+}
+
+// ── toolLoadAutotradeSignal ───────────────────────────────────────────────────
+
+async function toolLoadAutotradeSignal({ coin = null } = {}) {
+  const { readdirSync, readFileSync, existsSync, statSync } = await import('fs');
+
+  if (!existsSync(SIGNALS_DIR)) {
+    return { ok: false, error: `Cartella signals non trovata: ${SIGNALS_DIR}. Avvia prima run_autotrade_research.` };
+  }
+
+  const files = readdirSync(SIGNALS_DIR)
+    .filter(f => f.endsWith('.json') && f.startsWith('signal_') && (!coin || f.includes(coin.toLowerCase())))
+    .map(f => ({ file: f, mtime: statSync(path.join(SIGNALS_DIR, f)).mtimeMs }))
+    .sort((a, b) => b.mtime - a.mtime);
+
+  if (files.length === 0) {
+    return { ok: false, error: `Nessun signal trovato${coin ? ` per ${coin}` : ''}. Avvia prima run_autotrade_research.` };
+  }
+
+  const signalPath = path.join(SIGNALS_DIR, files[0].file);
+  const signal     = JSON.parse(readFileSync(signalPath, 'utf-8'));
+
+  return {
+    ok:               true,
+    signal_file:      files[0].file,
+    signal_path:      signalPath,
+    coin:             signal.coin,
+    timeframe:        signal.timeframe,
+    ready_for_live:   signal.ready_for_live,
+    composite_score:  signal.composite_score,
+    backtest_metrics: signal.backtest_metrics,
+    risk:             signal.signal_params?.risk,
+    warnings:         signal.warnings ?? [],
+    generated_at:     signal.generated_at,
+    message:          signal.ready_for_live
+      ? `Strategia pronta: PF=${signal.backtest_metrics?.profit_factor}, DD=${signal.backtest_metrics?.max_drawdown_pct}%. Puoi proporre il trade con place_order.`
+      : `Strategia non pronta per il live. Warnings: ${(signal.warnings ?? []).join('; ')}`,
+  };
+}
+
+// ── Tool definitions ──────────────────────────────────────────────────────────
 
 export const TOOL_DEFINITIONS = [
   {
@@ -324,7 +391,7 @@ export const TOOL_DEFINITIONS = [
     description: 'Get details about a Hyperliquid vault (TVL, leader, performance).',
     input_schema: { type: 'object', properties: { vault_address: { type: 'string' } }, required: ['vault_address'] },
   },
-  // ── Onchain fee tools ──────────────────────────────────────────────────────
+  // ── Onchain fee tools ─────────────────────────────────────────────────────
   {
     name: 'get_hype_fees',
     description: 'Fetch HYPE fee data combining two sources: (1) volume-based USDC inflow estimate from protocol dayNtlVlm, (2) real onchain HYPE balance delta of the Assistance Fund via eth_getBalance at two blocks. Returns usdc_inflow, hype_burned, hype_delta, burn_signal_strength, fee_rate_per_hour, burn_source. Always call this — never estimate manually.',
@@ -356,7 +423,33 @@ export const TOOL_DEFINITIONS = [
       },
     },
   },
-  // ── Write tools ────────────────────────────────────────────────────────────
+  // ── Autotrade Strategy Research ───────────────────────────────────────────
+  {
+    name: 'run_autotrade_research',
+    description: 'Avvia una ricerca autonoma di strategie di trading tramite backtesting LLM (autotrade). Claude Code itera su strategie, le backtesta su dati Hyperliquid reali e seleziona la migliore. Il processo gira in background — chiama load_autotrade_signal quando completa per vedere il risultato.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        coin:         { type: 'string',  description: 'Ticker del perpetual su Hyperliquid (es. BTC, ETH, SOL, HYPE)' },
+        timeframe:    { type: 'string',  enum: ['15m','1h','4h','1d'], description: 'Timeframe candele (default: 1h)' },
+        iterations:   { type: 'number', description: 'Numero iterazioni LLM (default: 20, max consigliato: 50)' },
+        min_pf:       { type: 'number', description: 'Profit factor minimo (default: 1.2)' },
+        max_drawdown: { type: 'number', description: 'Drawdown massimo % negativo (default: -25)' },
+        max_leverage: { type: 'number', description: 'Leva massima (default: 3)' },
+      },
+    },
+  },
+  {
+    name: 'load_autotrade_signal',
+    description: 'Carica il signal JSON più recente generato da autotrade. Contiene la migliore strategia trovata con metriche di backtest (profit factor, drawdown, sharpe, win rate) e parametri di rischio (SL, TP, leverage, size). Chiama questo tool dopo run_autotrade_research.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        coin: { type: 'string', description: 'Filtra per coin (opzionale)' },
+      },
+    },
+  },
+  // ── Write tools ───────────────────────────────────────────────────────────
   {
     name: 'place_order',
     description: 'Queue a trade for approval. Not executed until user approves.',
@@ -471,7 +564,7 @@ export const TOOL_DEFINITIONS = [
   },
 ];
 
-// ── Tool handler ───────────────────────────────────────────────────────────────
+// ── Tool handler ──────────────────────────────────────────────────────────────
 
 export async function handleTool(name, input, { api, signer, walletAddress, vaultAddress, playbookContext }) {
   switch (name) {
@@ -494,12 +587,16 @@ export async function handleTool(name, input, { api, signer, walletAddress, vaul
     case 'search_coins':        return api.searchCoins(input.query);
     case 'get_vault_details':   return api.getVaultDetails(input.vault_address);
 
-    // ── Onchain fee tools ──────────────────────────────────────────────────────
+    // ── Onchain fee tools ───────────────────────────────────────────────────
     case 'get_hype_fees':       return toolGetHypeFees(input);
     case 'get_hype_orderbook':  return toolGetHypeOrderbook(input);
     case 'get_hype_signal':     return toolGetHypeSignal(input);
 
-    // ── Write tools ────────────────────────────────────────────────────────────
+    // ── Autotrade Strategy Research ─────────────────────────────────────────
+    case 'run_autotrade_research': return toolRunAutotradeResearch(input);
+    case 'load_autotrade_signal':  return toolLoadAutotradeSignal(input);
+
+    // ── Write tools ─────────────────────────────────────────────────────────
     case 'place_order': {
       const approval = Permissions.queue({
         playbookId:  input.playbook_id ?? playbookContext?.id ?? null,
@@ -589,12 +686,12 @@ export async function handleTool(name, input, { api, signer, walletAddress, vaul
   }
 }
 
-// ── Execute approved order ─────────────────────────────────────────────────────
+// ── Execute approved order ────────────────────────────────────────────────────
 
 export async function executeApprovedOrder(approval, { api, signer, vaultAddress }) {
   if (!signer) throw new Error('No signer — add HL_PRIVATE_KEY in Settings');
 
-  // ── Exit orders ─────────────────────────────────────────────────────────────
+  // ── Exit orders ─────────────────────────────────────────────────────────
   if (approval.order_type === 'EXIT_ORDERS') {
     const params = JSON.parse(approval.price);
     const { coin, position_side, total_size, stop_loss_price, tp1_price, tp1_size, tp2_price, tp2_size, tp3_price, tp3_size } = params;
@@ -689,7 +786,7 @@ export async function executeApprovedOrder(approval, { api, signer, vaultAddress
     };
   }
 
-  // ── Cancel ──────────────────────────────────────────────────────────────────
+  // ── Cancel ──────────────────────────────────────────────────────────────
   if (approval.order_type === 'CANCEL') {
     const oid        = parseInt(approval.size);
     const assetIndex = await api.getAssetIndex(approval.coin);
@@ -697,7 +794,7 @@ export async function executeApprovedOrder(approval, { api, signer, vaultAddress
     return api.submitAction(payload.action, payload.nonce, payload.signature, payload.vaultAddress);
   }
 
-  // ── Set leverage ─────────────────────────────────────────────────────────────
+  // ── Set leverage ─────────────────────────────────────────────────────────
   if (approval.order_type === 'SET_LEVERAGE') {
     const leverage   = parseInt(approval.size);
     const assetIndex = await api.getAssetIndex(approval.coin);
@@ -705,7 +802,7 @@ export async function executeApprovedOrder(approval, { api, signer, vaultAddress
     return api.submitAction(payload.action, payload.nonce, payload.signature, payload.vaultAddress);
   }
 
-  // ── Regular order ────────────────────────────────────────────────────────────
+  // ── Regular order ────────────────────────────────────────────────────────
   const assetIndex = await api.getAssetIndex(approval.coin);
   const asset      = await api.getAssetInfo(approval.coin);
   const isBuy      = approval.side === 'BUY';
@@ -738,7 +835,7 @@ export async function executeApprovedOrder(approval, { api, signer, vaultAddress
   return result;
 }
 
-// ── Signer test ────────────────────────────────────────────────────────────────
+// ── Signer test ───────────────────────────────────────────────────────────────
 
 export async function testSigner(signer, api, coin = 'BTC') {
   if (!signer) return { ok: false, error: 'No signer configured' };
@@ -753,7 +850,7 @@ export async function testSigner(signer, api, coin = 'BTC') {
   }
 }
 
-// ── Technical indicators ───────────────────────────────────────────────────────
+// ── Technical indicators ──────────────────────────────────────────────────────
 
 function computeIndicators(candles, indicators) {
   if (!candles || candles.length < 2) return { error: 'Not enough candle data' };

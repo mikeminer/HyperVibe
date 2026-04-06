@@ -1,0 +1,10 @@
+{
+  "name": "hypervibe-autotrade-tools",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Autotrade bridge and signal loader for HyperVibe",
+  "dependencies": {
+    "@nktkas/hyperliquid": "^0.32.2",
+    "ethers": "^6.16.0"
+  }
+}
