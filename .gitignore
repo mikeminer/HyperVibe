@@ -1,3 +1,8 @@
 node_modules/ 
 .env 
 *.db 
+hypervibe/tools/autotrade/node_modules/
+hypervibe/tools/autotrade/autotrade/src/results.jsonl
+hypervibe/tools/autotrade/autotrade/.env
+hypervibe/tools/autotrade/autotrade/src/strategies/generated/
+playbooks/signals/

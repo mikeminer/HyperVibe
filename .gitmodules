@@ -1,0 +1,3 @@
+[submodule "hypervibe/tools/autotrade/autotrade"]
+	path = hypervibe/tools/autotrade/autotrade
+	url = https://github.com/rv64m/autotrade.git
