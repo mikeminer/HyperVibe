@@ -111,21 +111,15 @@ REM Crea directory tools
 mkdir "%TOOLS_DIR%" >nul 2>&1
 echo  Cartella tools creata: %TOOLS_DIR%
 
-REM Clona autotrade se non presente
-if exist "%TOOLS_DIR%\autotrade\src\program.md" (
-    echo  Aggiornamento autotrade...
-    cd /d "%TOOLS_DIR%\autotrade"
-    git pull --quiet
-    echo  OK - autotrade aggiornato
-) else (
-    echo  Clone autotrade...
-    git clone https://github.com/rv64m/autotrade.git "%TOOLS_DIR%\autotrade"
-    if %errorlevel% neq 0 (
-        echo  ERRORE: Clone autotrade fallito. Continuo senza modulo.
-        goto STEP5
-    )
-    echo  OK - autotrade clonato
+REM Inizializza submodule autotrade
+echo  Inizializzazione submodule autotrade...
+cd /d "%HV_DIR%"
+git submodule update --init --recursive
+if %errorlevel% neq 0 (
+    echo  ERRORE: submodule update fallito. Continuo senza modulo.
+    goto STEP5
 )
+echo  OK - autotrade submodule inizializzato
 
 REM Crea package.json per tools/autotrade se non esiste
 if not exist "%TOOLS_DIR%\package.json" (
