@@ -1,6 +1,6 @@
 @echo off
 setlocal EnableDelayedExpansion
-title HyperVibe Installer v3.1
+title HyperVibe Installer v3.2
 chcp 437 >nul
 
 set INSTALL_DIR=%~dp0
@@ -9,10 +9,11 @@ set HV_DIR=%INSTALL_DIR%\HyperVibe
 set APP_DIR=%HV_DIR%\hypervibe
 set ENV_FILE=%APP_DIR%\.env
 set TMP_DIR=%TEMP%\hypervibe_install
+set TOOLS_DIR=%APP_DIR%\tools\autotrade
 
 echo.
 echo  ==========================================
-echo   HYPERVIBE - Installer v3.1
+echo   HYPERVIBE - Installer v3.2
 echo   Cartella: %INSTALL_DIR%
 echo  ==========================================
 echo.
@@ -20,7 +21,7 @@ echo.
 mkdir "%TMP_DIR%" >nul 2>&1
 
 REM ── Step 1: Node.js ──────────────────────────────────────────────────────────
-echo [1/6] Node.js...
+echo [1/7] Node.js...
 node --version >nul 2>&1
 if %errorlevel% equ 0 goto NODE_OK
 
@@ -47,7 +48,7 @@ for /f %%v in ('node --version') do set NODEVER=%%v
 echo  OK - Node.js %NODEVER%
 
 REM ── Step 2: Git ──────────────────────────────────────────────────────────────
-echo [2/6] Git...
+echo [2/7] Git...
 git --version >nul 2>&1
 if %errorlevel% equ 0 goto GIT_OK
 
@@ -73,7 +74,7 @@ if %errorlevel% neq 0 ( echo  ERRORE: Riavvia il PC e riesegui. & pause & exit /
 echo  OK - Git trovato
 
 REM ── Step 3: Clone / Pull ─────────────────────────────────────────────────────
-echo [3/6] HyperVibe...
+echo [3/7] HyperVibe...
 if exist "%APP_DIR%\package.json" goto DO_PULL
 echo  Cloning...
 git clone https://github.com/mikeminer/HyperVibe.git "%HV_DIR%"
@@ -88,15 +89,104 @@ echo  OK - Aggiornato
 
 REM ── Step 4: npm install ──────────────────────────────────────────────────────
 :STEP4
-echo [4/6] Dipendenze npm...
+echo [4/7] Dipendenze npm...
 cd /d "%APP_DIR%"
 if exist "node_modules" rmdir /s /q node_modules >nul 2>&1
 call npm install --silent
 if %errorlevel% neq 0 ( echo  ERRORE: npm install fallito. & pause & exit /b 1 )
 echo  OK - Dipendenze installate
 
+REM ── Step 4b: Autotrade Integration ───────────────────────────────────────────
+echo.
+echo [4b/7] Autotrade Strategy Research (opzionale)...
+echo   Installa il modulo di ricerca autonoma strategie via backtesting LLM.
+echo   Richiede ~200MB. Necessario per il Playbook "Autotrade Strategy Research".
+echo.
+set INSTALL_AUTOTRADE=
+set /p INSTALL_AUTOTRADE="  Installare il modulo Autotrade? (S/N): "
+if /i "!INSTALL_AUTOTRADE!" neq "S" goto STEP5
+echo.
+
+REM Crea directory tools
+mkdir "%TOOLS_DIR%" >nul 2>&1
+echo  Cartella tools creata: %TOOLS_DIR%
+
+REM Clona autotrade se non presente
+if exist "%TOOLS_DIR%\autotrade\src\program.md" (
+    echo  Aggiornamento autotrade...
+    cd /d "%TOOLS_DIR%\autotrade"
+    git pull --quiet
+    echo  OK - autotrade aggiornato
+) else (
+    echo  Clone autotrade...
+    git clone https://github.com/rv64m/autotrade.git "%TOOLS_DIR%\autotrade"
+    if %errorlevel% neq 0 (
+        echo  ERRORE: Clone autotrade fallito. Continuo senza modulo.
+        goto STEP5
+    )
+    echo  OK - autotrade clonato
+)
+
+REM Crea package.json per tools/autotrade se non esiste
+if not exist "%TOOLS_DIR%\package.json" (
+    echo  Inizializzazione package.json tools...
+    >"%TOOLS_DIR%\package.json" echo {
+    >>"%TOOLS_DIR%\package.json" echo   "name": "hypervibe-autotrade-tools",
+    >>"%TOOLS_DIR%\package.json" echo   "version": "1.0.0",
+    >>"%TOOLS_DIR%\package.json" echo   "type": "module",
+    >>"%TOOLS_DIR%\package.json" echo   "description": "Autotrade bridge and signal loader for HyperVibe",
+    >>"%TOOLS_DIR%\package.json" echo   "dependencies": {
+    >>"%TOOLS_DIR%\package.json" echo     "@nktkas/hyperliquid": "^0.11.0",
+    >>"%TOOLS_DIR%\package.json" echo     "ethers": "^6.13.0"
+    >>"%TOOLS_DIR%\package.json" echo   }
+    >>"%TOOLS_DIR%\package.json" echo }
+)
+
+REM Installa dipendenze Hyperliquid + ethers
+echo  Installazione @nktkas/hyperliquid ed ethers...
+cd /d "%TOOLS_DIR%"
+call npm install --silent
+if %errorlevel% neq 0 (
+    echo  ERRORE: npm install tools fallito. Continuo senza modulo.
+    goto STEP5
+)
+echo  OK - @nktkas/hyperliquid ed ethers installati
+
+REM Verifica presenza script bridge e loader
+set MISSING_SCRIPTS=0
+if not exist "%TOOLS_DIR%\autotrade-bridge.js" set MISSING_SCRIPTS=1
+if not exist "%TOOLS_DIR%\signal-loader.js"    set MISSING_SCRIPTS=1
+
+if "!MISSING_SCRIPTS!"=="1" (
+    echo.
+    echo  ATTENZIONE: autotrade-bridge.js e signal-loader.js non trovati in:
+    echo   %TOOLS_DIR%
+    echo.
+    echo  Copiali manualmente da:
+    echo   https://github.com/mikeminer/HyperVibe/tree/main/hypervibe/tools/autotrade/
+    echo.
+) else (
+    echo  OK - autotrade-bridge.js e signal-loader.js presenti
+)
+
+REM Crea cartella segnali
+mkdir "%APP_DIR%\playbooks\signals" >nul 2>&1
+echo  OK - Cartella playbooks\signals creata
+
+echo.
+echo  ==========================================
+echo   Autotrade installato in:
+echo   %TOOLS_DIR%
+echo.
+echo   Uso da chat HyperVibe:
+echo   "Ricerca una strategia su SOL con autotrade"
+echo  ==========================================
+echo.
+set INSTALL_AUTOTRADE_OK=1
+
 REM ── Step 5: Scelta motore AI ─────────────────────────────────────────────────
-echo [5/6] Motore AI...
+:STEP5
+echo [5/7] Motore AI...
 echo.
 echo   [1] Anthropic API   - Claude cloud, a pagamento, qualita' massima
 echo   [2] Qwen 2.5 14B    - Locale, gratuito, ~9GB RAM  (consigliato)
@@ -145,11 +235,9 @@ REM ── Ollama ────────────────────�
 echo.
 echo  Verifica Ollama...
 
-REM Controlla se Ollama e' installato
 ollama --version >nul 2>&1
 if %errorlevel% neq 0 goto INSTALL_OLLAMA
 
-REM gemma4 richiede >= 0.20 — controlla la versione
 if "!FORCE_UPDATE_OLLAMA!"=="1" (
     ollama --version > "%TMP_DIR%\olv.txt" 2>&1
     node -e "var s=require('fs').readFileSync(process.env.TEMP+'\\hypervibe_install\\olv.txt','utf8');var m=s.match(/(\d+)\.(\d+)/);process.exit(!m||parseInt(m[2])<20?1:0);" >nul 2>&1
@@ -161,7 +249,6 @@ if "!FORCE_UPDATE_OLLAMA!"=="1" (
     goto INSTALL_OLLAMA
 )
 
-REM qwen e altri: basta che Ollama esista
 goto OLLAMA_READY
 
 :INSTALL_OLLAMA
@@ -180,7 +267,6 @@ if %errorlevel% neq 0 ( echo  ERRORE: Ollama non installato. & pause & exit /b 1
 for /f "tokens=*" %%v in ('ollama --version 2^>nul') do set OLLAMA_VER=%%v
 echo  OK - Ollama (!OLLAMA_VER!)
 
-REM Avvia server Ollama se non attivo
 curl -s http://localhost:11434/api/tags >nul 2>&1
 if %errorlevel% neq 0 (
     echo  Avvio server Ollama...
@@ -188,7 +274,6 @@ if %errorlevel% neq 0 (
     ping -n 6 127.0.0.1 >nul 2>&1
 )
 
-REM Scarica modello se non presente
 ollama list 2>nul | findstr /i "!OLLAMA_MODEL:~0,10!" >nul 2>&1
 if %errorlevel% equ 0 (
     echo  OK - !OLLAMA_MODEL! gia' presente
@@ -202,7 +287,7 @@ echo  OK - !OLLAMA_MODEL! scaricato
 REM ── Step 6: Credenziali ───────────────────────────────────────────────────────
 :STEP6
 echo.
-echo [6/6] Credenziali Hyperliquid...
+echo [6/7] Credenziali Hyperliquid...
 echo.
 set CUR_WALLET=
 set CUR_PK=
@@ -246,7 +331,9 @@ set /p NEW_TGC="      Valore: "
 if "!NEW_TGC!"=="" (set FINAL_TGC=!CUR_TG_CHAT!) else (set FINAL_TGC=!NEW_TGC!)
 echo.
 
-REM ── Scrivi .env ──────────────────────────────────────────────────────────────
+REM ── Step 7: Scrivi .env ──────────────────────────────────────────────────────
+:STEP7
+echo [7/7] Salvataggio configurazione...
 if exist "%ENV_FILE%" del "%ENV_FILE%"
 
 >>"%ENV_FILE%" echo PROVIDER=!PROVIDER!
@@ -261,6 +348,12 @@ if not "!CLAUDE_MODEL!"==""  >>"%ENV_FILE%" echo CLAUDE_MODEL=!CLAUDE_MODEL!
 >>"%ENV_FILE%" echo TELEGRAM_BOT_TOKEN=!FINAL_TGT!
 >>"%ENV_FILE%" echo TELEGRAM_CHAT_ID=!FINAL_TGC!
 
+REM Aggiunge path autotrade al .env se installato
+if "!INSTALL_AUTOTRADE_OK!"=="1" (
+    >>"%ENV_FILE%" echo AUTOTRADE_DIR=!TOOLS_DIR!\autotrade
+    >>"%ENV_FILE%" echo SIGNALS_DIR=!APP_DIR!\playbooks\signals
+)
+
 echo  OK - .env salvato
 rmdir /s /q "%TMP_DIR%" >nul 2>&1
 
@@ -269,6 +362,10 @@ echo  ==========================================
 echo   INSTALLAZIONE COMPLETATA
 echo   Motore AI : !PROVIDER! !OLLAMA_MODEL!
 echo   Network   : !FINAL_NET!
+if "!INSTALL_AUTOTRADE_OK!"=="1" (
+echo   Autotrade : INSTALLATO
+echo   Playbook  : "Autotrade Strategy Research"
+)
 echo  ==========================================
 echo.
 set /p LAUNCH="  Avviare HyperVibe ora? (S/N): "
