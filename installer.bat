@@ -1,24 +1,34 @@
 @echo off
 setlocal EnableDelayedExpansion
-title HyperVibe Installer v3.2
+title HyperVibe Installer v3.3
 chcp 437 >nul
 
 set INSTALL_DIR=%~dp0
 set INSTALL_DIR=%INSTALL_DIR:~0,-1%
-set HV_DIR=%INSTALL_DIR%\HyperVibe
-set APP_DIR=%HV_DIR%\hypervibe
-set ENV_FILE=%APP_DIR%\.env
 set TMP_DIR=%TEMP%\hypervibe_install
-set TOOLS_DIR=%APP_DIR%\tools\autotrade
 
 echo.
 echo  ==========================================
-echo   HYPERVIBE - Installer v3.2
+echo   HYPERVIBE - Installer v3.3
 echo   Cartella: %INSTALL_DIR%
 echo  ==========================================
 echo.
 
 mkdir "%TMP_DIR%" >nul 2>&1
+
+REM ── Rileva se siamo gia' dentro la repo o fuori ──────────────────────────────
+if exist "%INSTALL_DIR%\hypervibe\package.json" (
+    set HV_DIR=%INSTALL_DIR%
+    set APP_DIR=%INSTALL_DIR%\hypervibe
+    set ALREADY_CLONED=1
+) else (
+    set HV_DIR=%INSTALL_DIR%\HyperVibe
+    set APP_DIR=%INSTALL_DIR%\HyperVibe\hypervibe
+    set ALREADY_CLONED=0
+)
+
+set ENV_FILE=%APP_DIR%\.env
+set TOOLS_DIR=%APP_DIR%\tools\autotrade
 
 REM ── Step 1: Node.js ──────────────────────────────────────────────────────────
 echo [1/7] Node.js...
@@ -75,22 +85,33 @@ echo  OK - Git trovato
 
 REM ── Step 3: Clone / Pull ─────────────────────────────────────────────────────
 echo [3/7] HyperVibe...
-if exist "%APP_DIR%\package.json" goto DO_PULL
+if "!ALREADY_CLONED!"=="1" (
+    echo  Aggiornamento repo esistente...
+    cd /d "%HV_DIR%"
+    git pull
+    echo  OK - Aggiornato
+    goto STEP4
+)
+if exist "%APP_DIR%\package.json" (
+    echo  Aggiornamento...
+    cd /d "%HV_DIR%"
+    git pull
+    echo  OK - Aggiornato
+    goto STEP4
+)
 echo  Cloning...
 git clone https://github.com/mikeminer/HyperVibe.git "%HV_DIR%"
 if %errorlevel% neq 0 ( echo  ERRORE: Clone fallito. & pause & exit /b 1 )
 echo  OK - Clonato
-goto STEP4
-:DO_PULL
-echo  Aggiornamento...
-cd /d "%HV_DIR%"
-git pull
-echo  OK - Aggiornato
 
 REM ── Step 4: npm install ──────────────────────────────────────────────────────
 :STEP4
 echo [4/7] Dipendenze npm...
 cd /d "%APP_DIR%"
+if not exist "package.json" (
+    echo  ERRORE: package.json non trovato in %APP_DIR%
+    pause & exit /b 1
+)
 if exist "node_modules" rmdir /s /q node_modules >nul 2>&1
 call npm install --silent
 if %errorlevel% neq 0 ( echo  ERRORE: npm install fallito. & pause & exit /b 1 )
@@ -107,11 +128,9 @@ set /p INSTALL_AUTOTRADE="  Installare il modulo Autotrade? (S/N): "
 if /i "!INSTALL_AUTOTRADE!" neq "S" goto STEP5
 echo.
 
-REM Crea directory tools
 mkdir "%TOOLS_DIR%" >nul 2>&1
 echo  Cartella tools creata: %TOOLS_DIR%
 
-REM Inizializza submodule autotrade
 echo  Inizializzazione submodule autotrade...
 cd /d "%HV_DIR%"
 git submodule update --init --recursive
@@ -121,7 +140,6 @@ if %errorlevel% neq 0 (
 )
 echo  OK - autotrade submodule inizializzato
 
-REM Crea package.json per tools/autotrade se non esiste
 if not exist "%TOOLS_DIR%\package.json" (
     echo  Inizializzazione package.json tools...
     (
@@ -134,7 +152,6 @@ if not exist "%TOOLS_DIR%\package.json" (
     ) > "%TOOLS_DIR%\package.json"
 )
 
-REM Installa dipendenze con versioni latest — evita problemi di versione inesistente
 echo  Installazione @nktkas/hyperliquid ed ethers...
 cd /d "%TOOLS_DIR%"
 call npm install @nktkas/hyperliquid@latest ethers@latest --silent
@@ -144,7 +161,6 @@ if %errorlevel% neq 0 (
 )
 echo  OK - @nktkas/hyperliquid ed ethers installati
 
-REM Installa Claude Code CLI (richiesto da autotrade per il loop LLM)
 echo  Installazione Claude Code CLI...
 claude --version >nul 2>&1
 if %errorlevel% equ 0 (
@@ -159,34 +175,20 @@ if %errorlevel% equ 0 (
     )
 )
 
-REM Verifica presenza script bridge e loader
 set MISSING_SCRIPTS=0
 if not exist "%TOOLS_DIR%\autotrade-bridge.js" set MISSING_SCRIPTS=1
 if not exist "%TOOLS_DIR%\signal-loader.js"    set MISSING_SCRIPTS=1
-
 if "!MISSING_SCRIPTS!"=="1" (
     echo.
     echo  ATTENZIONE: autotrade-bridge.js e/o signal-loader.js non trovati in:
     echo   %TOOLS_DIR%
-    echo  Copiali manualmente da:
-    echo   https://github.com/mikeminer/HyperVibe/tree/main/hypervibe/tools/autotrade/
     echo.
 ) else (
     echo  OK - autotrade-bridge.js e signal-loader.js presenti
 )
 
-REM Crea cartella segnali
 mkdir "%APP_DIR%\playbooks\signals" >nul 2>&1
 echo  OK - Cartella playbooks\signals creata
-
-echo.
-echo  ==========================================
-echo   Autotrade installato in:
-echo   %TOOLS_DIR%
-echo.
-echo   Uso da chat HyperVibe:
-echo   "Ricerca una strategia su SOL con autotrade"
-echo  ==========================================
 echo.
 set INSTALL_AUTOTRADE_OK=1
 
@@ -236,25 +238,19 @@ set FORCE_UPDATE_OLLAMA=1
 set FINAL_A=
 set CLAUDE_MODEL=
 
-REM ── Ollama ───────────────────────────────────────────────────────────────────
 :OLLAMA_SETUP
 echo.
 echo  Verifica Ollama...
-
 ollama --version >nul 2>&1
 if %errorlevel% neq 0 goto INSTALL_OLLAMA
 
 if "!FORCE_UPDATE_OLLAMA!"=="1" (
     ollama --version > "%TMP_DIR%\olv.txt" 2>&1
     node -e "var s=require('fs').readFileSync(process.env.TEMP+'\\hypervibe_install\\olv.txt','utf8');var m=s.match(/(\d+)\.(\d+)/);process.exit(!m||parseInt(m[2])<20?1:0);" >nul 2>&1
-    if !errorlevel! equ 0 (
-        echo  OK - Ollama gia' aggiornato, skip download
-        goto OLLAMA_READY
-    )
-    echo  Ollama troppo vecchio per gemma4 - aggiornamento in corso...
+    if !errorlevel! equ 0 ( echo  OK - Ollama gia' aggiornato & goto OLLAMA_READY )
+    echo  Aggiornamento Ollama per gemma4...
     goto INSTALL_OLLAMA
 )
-
 goto OLLAMA_READY
 
 :INSTALL_OLLAMA
@@ -263,7 +259,6 @@ curl -L --progress-bar -o "%TMP_DIR%\OllamaSetup.exe" "https://ollama.com/downlo
 if %errorlevel% neq 0 ( echo  ERRORE: Download Ollama fallito. & pause & exit /b 1 )
 echo  Installazione Ollama...
 "%TMP_DIR%\OllamaSetup.exe" /S
-echo  Attendo avvio servizio...
 ping -n 10 127.0.0.1 >nul 2>&1
 set "PATH=%LOCALAPPDATA%\Programs\Ollama;%PATH%"
 ollama --version >nul 2>&1
@@ -272,25 +267,16 @@ if %errorlevel% neq 0 ( echo  ERRORE: Ollama non installato. & pause & exit /b 1
 :OLLAMA_READY
 for /f "tokens=*" %%v in ('ollama --version 2^>nul') do set OLLAMA_VER=%%v
 echo  OK - Ollama (!OLLAMA_VER!)
-
 curl -s http://localhost:11434/api/tags >nul 2>&1
-if %errorlevel% neq 0 (
-    echo  Avvio server Ollama...
-    start /B ollama serve >nul 2>&1
-    ping -n 6 127.0.0.1 >nul 2>&1
-)
-
+if %errorlevel% neq 0 ( start /B ollama serve >nul 2>&1 & ping -n 6 127.0.0.1 >nul 2>&1 )
 ollama list 2>nul | findstr /i "!OLLAMA_MODEL:~0,10!" >nul 2>&1
-if %errorlevel% equ 0 (
-    echo  OK - !OLLAMA_MODEL! gia' presente
-    goto STEP6
-)
-echo  Download !OLLAMA_MODEL! (potrebbe richiedere alcuni minuti)...
+if %errorlevel% equ 0 ( echo  OK - !OLLAMA_MODEL! gia' presente & goto STEP6 )
+echo  Download !OLLAMA_MODEL!...
 ollama pull !OLLAMA_MODEL!
 if %errorlevel% neq 0 ( echo  ERRORE: Download modello fallito. & pause & exit /b 1 )
 echo  OK - !OLLAMA_MODEL! scaricato
 
-REM ── Step 6: Credenziali ───────────────────────────────────────────────────────
+REM ── Step 6: Credenziali ──────────────────────────────────────────────────────
 :STEP6
 echo.
 echo [6/7] Credenziali Hyperliquid...
@@ -353,7 +339,6 @@ if not "!CLAUDE_MODEL!"==""  >>"%ENV_FILE%" echo CLAUDE_MODEL=!CLAUDE_MODEL!
 >>"%ENV_FILE%" echo PORT=3001
 >>"%ENV_FILE%" echo TELEGRAM_BOT_TOKEN=!FINAL_TGT!
 >>"%ENV_FILE%" echo TELEGRAM_CHAT_ID=!FINAL_TGC!
-
 if "!INSTALL_AUTOTRADE_OK!"=="1" (
     >>"%ENV_FILE%" echo AUTOTRADE_DIR=!TOOLS_DIR!\autotrade
     >>"%ENV_FILE%" echo SIGNALS_DIR=!APP_DIR!\playbooks\signals
@@ -367,10 +352,7 @@ echo  ==========================================
 echo   INSTALLAZIONE COMPLETATA
 echo   Motore AI : !PROVIDER! !OLLAMA_MODEL!
 echo   Network   : !FINAL_NET!
-if "!INSTALL_AUTOTRADE_OK!"=="1" (
-echo   Autotrade : INSTALLATO
-echo   Playbook  : "Autotrade Strategy Research"
-)
+if "!INSTALL_AUTOTRADE_OK!"=="1" echo   Autotrade : INSTALLATO
 echo  ==========================================
 echo.
 set /p LAUNCH="  Avviare HyperVibe ora? (S/N): "
