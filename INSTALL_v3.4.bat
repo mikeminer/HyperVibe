@@ -436,7 +436,7 @@ if not exist "%BITNET_DIR%\setup_env.py" (
 REM ·· Dipendenze Python BitNet ·················································
 echo  [*] Installazione requirements.txt BitNet...
 cd /d "%BITNET_DIR%"
-python -m pip install -r requirements.txt --quiet
+python -m pip install -r requirements.txt --user
 if %errorlevel% neq 0 (
     echo  ERRORE: pip install requirements.txt fallito.
     pause
