@@ -1,0 +1,24 @@
+# ─── Tri-Hybrid AI Engine — Python Dependencies ───────────────────────────────
+# Python >= 3.11 required (asyncio.TaskGroup, match statement)
+
+# ── AI SDK Clients ────────────────────────────────────────────────────────────
+anthropic>=0.40.0
+openai>=1.50.0
+
+# ── Async HTTP (Ollama + health checks) ──────────────────────────────────────
+aiohttp>=3.9.0
+
+# ── Optional: faster tokenisation for budget estimation ──────────────────────
+# tiktoken>=0.7.0         # Uncomment for precise OpenAI token counting
+
+# ── Optional: local embedding for semantic confidence ────────────────────────
+# sentence-transformers>=3.0.0   # Heavy — skip unless you need semantic scoring
+
+# ── Dev / Testing ─────────────────────────────────────────────────────────────
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+
+# ── Bridge Server ─────────────────────────────────────────────────────────────
+fastapi>=0.115.0
+uvicorn>=0.30.0
+
