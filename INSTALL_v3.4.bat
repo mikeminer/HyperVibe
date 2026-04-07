@@ -1,6 +1,6 @@
 @echo off
 setlocal EnableDelayedExpansion
-title HyperVibe Installer v3.6
+title HyperVibe Installer v3.7
 chcp 437 >nul
 
 set INSTALL_DIR=%~dp0
@@ -9,7 +9,7 @@ set TMP_DIR=%TEMP%\hypervibe_install
 
 echo.
 echo  ==========================================
-echo   HYPERVIBE - Installer v3.6
+echo   HYPERVIBE - Installer v3.7
 echo   Cartella: %INSTALL_DIR%
 echo  ==========================================
 echo.
@@ -300,6 +300,7 @@ echo   HyperVibe funzionera' in modalita' CHAT/ANALISI.
 echo.
 echo   PREREQUISITI OBBLIGATORI:
 echo     - Visual Studio con workload "Sviluppo desktop C++"
+echo     - LLVM/Clang  (richiesto da BitNet per la build)
 echo     - Python 3.11 (NON 3.12: torch 2.2.1 non supporta 3.12)
 echo       https://www.python.org/downloads/release/python-3119/
 echo.
@@ -307,7 +308,7 @@ set BITNET_OK=
 set /p BITNET_OK="  Continuare con BitNet? (S/N): "
 if /i "!BITNET_OK!" neq "S" goto STEP5
 
-REM ·· Cerca VsDevCmd.bat via vswhere ··········································
+REM ·· Cerca VsDevCmd.bat via vswhere ──────────────────────────────────────────
 echo.
 echo  [*] Ricerca Visual Studio con workload C++...
 set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
@@ -333,7 +334,7 @@ if not defined VSDEVCMD (
 )
 echo  OK - Trovato: !VSDEVCMD!
 
-REM ·· CMake ····················································
+REM ·· CMake ───────────────────────────────────────────────────────────────────
 echo  [*] Verifica CMake...
 cmake --version >nul 2>&1
 if %errorlevel% neq 0 (
@@ -349,28 +350,54 @@ if %errorlevel% neq 0 (
 )
 echo  OK - CMake trovato
 
-REM ·· Python 3.11 obbligatorio (torch 2.2.1 non supporta 3.12+) ··············
+REM ·· LLVM/Clang (richiesto da BitNet: cmake usa -T ClangCL) ─────────────────
+echo  [*] Verifica LLVM/Clang...
+clang --version >nul 2>&1
+if %errorlevel% neq 0 (
+    echo  Clang non trovato. Installazione LLVM via winget...
+    echo  Questa operazione puo' richiedere qualche minuto...
+    winget install --id LLVM.LLVM --silent --accept-package-agreements --accept-source-agreements
+    if %errorlevel% neq 0 (
+        echo  ERRORE: Installazione LLVM fallita.
+        echo  Scarica manualmente da:
+        echo    https://github.com/llvm/llvm-project/releases
+        echo  Scegli il file LLVM-xx.x.x-win64.exe e seleziona
+        echo  "Add LLVM to the system PATH for all users".
+        pause
+        goto STEP5
+    )
+    REM Aggiorna PATH per la sessione corrente
+    set "PATH=C:\Program Files\LLVM\bin;%PATH%"
+    ping -n 3 127.0.0.1 >nul 2>&1
+    clang --version >nul 2>&1
+    if %errorlevel% neq 0 (
+        echo  ERRORE: LLVM installato ma clang non raggiungibile.
+        echo  Chiudi il terminale, riaprilo e riesegui l'installer.
+        pause
+        goto STEP5
+    )
+)
+for /f "tokens=1-4" %%a in ('clang --version 2^>^&1 ^| findstr /i "version"') do set CLANG_VER=%%d
+echo  OK - Clang !CLANG_VER!
+
+REM ·· Python 3.11 obbligatorio (torch 2.2.1 non supporta 3.12+) ───────────────
 echo  [*] Verifica Python 3.11 per BitNet...
 echo      torch 2.2.1 richiesto da BitNet non supporta Python 3.12+
 echo.
 set "PYEXE="
 
-REM Prova py launcher con 3.11
 py -3.11 --version >nul 2>&1
 if %errorlevel% equ 0 ( set "PYEXE=py -3.11" & goto PYTHON_BITNET_OK )
 
-REM Prova python3.11 diretto
 python3.11 --version >nul 2>&1
 if %errorlevel% equ 0 ( set "PYEXE=python3.11" & goto PYTHON_BITNET_OK )
 
-REM Prova path fissi comuni
 if exist "C:\Python311\python.exe" ( set "PYEXE=C:\Python311\python.exe" & goto PYTHON_BITNET_OK )
 if exist "%LOCALAPPDATA%\Programs\Python\Python311\python.exe" (
     set "PYEXE=%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
     goto PYTHON_BITNET_OK
 )
 
-REM Non trovato: installa via winget
 echo  Python 3.11 non trovato. Installazione in corso...
 winget install --id Python.Python.3.11 --silent --accept-package-agreements --accept-source-agreements
 if %errorlevel% neq 0 (
@@ -389,7 +416,6 @@ if exist "%LOCALAPPDATA%\Programs\Python\Python311\python.exe" (
     set "PYEXE=%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
     goto PYTHON_BITNET_OK
 )
-
 echo  ERRORE: Python 3.11 installato ma non raggiungibile.
 echo  Chiudi questo terminale, riaprilo e riesegui l'installer.
 pause
@@ -408,19 +434,18 @@ if %errorlevel% neq 0 (
     goto STEP5
 )
 
-REM ·· pip per Python 3.11 ·····················································
+REM ·· pip per Python 3.11 ─────────────────────────────────────────────────────
 echo  [*] Aggiornamento pip Python 3.11...
 !PYEXE! -m ensurepip --upgrade >nul 2>&1
-!PYEXE! -m pip install --upgrade pip setuptools wheel --user --quiet
+!PYEXE! -m pip install --upgrade pip setuptools wheel --user --quiet --no-warn-script-location
 if %errorlevel% neq 0 ( echo  ERRORE: aggiornamento pip fallito. & pause & goto STEP5 )
 
-REM huggingface-hub senza extra 'cli' (incluso di default nelle versioni recenti)
 echo  [*] Installazione huggingface-hub...
-!PYEXE! -m pip install --upgrade huggingface_hub --user --quiet
+!PYEXE! -m pip install --upgrade huggingface_hub --user --quiet --no-warn-script-location
 if %errorlevel% neq 0 ( echo  ERRORE: pip install huggingface_hub fallito. & pause & goto STEP5 )
 echo  OK - huggingface-hub pronto
 
-REM ·· Clone microsoft/BitNet ··················································
+REM ·· Clone microsoft/BitNet ──────────────────────────────────────────────────
 echo  [*] Verifica BitNet repo...
 if not exist "%BITNET_DIR%\setup_env.py" (
     echo  Clone microsoft/BitNet con submoduli, circa 500MB...
@@ -432,21 +457,24 @@ if not exist "%BITNET_DIR%\setup_env.py" (
     git -C "%BITNET_DIR%" pull >nul 2>&1
 )
 
-REM ·· Submoduli sempre aggiornati (llama.cpp + gguf-py) ·····················
+REM ·· Submoduli sempre aggiornati (llama.cpp + gguf-py) ──────────────────────
 echo  [*] Inizializzazione submoduli BitNet (llama.cpp / gguf-py)...
 git -C "%BITNET_DIR%" submodule update --init --recursive
 if %errorlevel% neq 0 ( echo  ERRORE: submodule update fallito. & pause & goto STEP5 )
 echo  OK - Submoduli pronti
 
-REM ·· Build in Developer shell via bat temporaneo ····························
-REM    requirements.txt installato DENTRO la shell con il Python 3.11 corretto
+REM ·· Build in Developer shell via bat temporaneo ─────────────────────────────
+REM    - requirements.txt installato DENTRO la shell con Python 3.11 corretto
+REM    - --no-warn-script-location sopprime i WARNING sui PATH degli script pip
+REM    - LLVM aggiunto al PATH prima di cmake per garantire clang raggiungibile
 set BITNET_BUILD_BAT=%TMP_DIR%\bitnet_build.bat
 (
     echo @echo off
+    echo set "PATH=C:\Program Files\LLVM\bin;%%PATH%%"
     echo call "!VSDEVCMD!" -startdir=none -arch=x64 -host_arch=x64
     echo if errorlevel 1 exit /b 1
     echo cd /d "!BITNET_DIR!"
-    echo !PYEXE! -m pip install -r requirements.txt --user --quiet
+    echo !PYEXE! -m pip install -r requirements.txt --user --quiet --no-warn-script-location
     echo if errorlevel 1 exit /b 1
     echo !PYEXE! setup_env.py -md models/BitNet-b1.58-2B-4T -q i2_s
     echo if errorlevel 1 exit /b 1
@@ -460,7 +488,14 @@ call "%BITNET_BUILD_BAT%"
 if %errorlevel% neq 0 (
     echo.
     echo  ERRORE: Build BitNet fallita.
+    echo  Controlla il log: !BITNET_DIR!\logs\generate_build_files.log
+    echo.
+    echo  Cause comuni:
+    echo    - LLVM non nel PATH: installa da https://github.com/llvm/llvm-project/releases
+    echo    - VS troppo vecchio: VS 2019 supportato ma richiede LLVM esterno
+    echo.
     echo  Prova manualmente dal "Developer Command Prompt for VS":
+    echo    set PATH=C:\Program Files\LLVM\bin;%%PATH%%
     echo    cd !BITNET_DIR!
     echo    !PYEXE! setup_env.py -md models/BitNet-b1.58-2B-4T -q i2_s
     echo.
@@ -469,7 +504,7 @@ if %errorlevel% neq 0 (
 )
 del "%BITNET_BUILD_BAT%" >nul 2>&1
 
-REM ·· Verifica .gguf prodotto ·················································
+REM ·· Verifica .gguf prodotto ─────────────────────────────────────────────────
 if not exist "%BITNET_DIR%\models\BitNet-b1.58-2B-4T\ggml-model-i2_s.gguf" (
     echo  ERRORE: .gguf non trovato dopo la build. Build incompleta.
     pause
@@ -669,7 +704,7 @@ set /p NEW_TGC="      Valore: "
 if "!NEW_TGC!"=="" (set FINAL_TGC=!CUR_TG_CHAT!) else (set FINAL_TGC=!NEW_TGC!)
 echo.
 
-REM ── Step 7: Scrivi .env (piatto, redirect a fine riga, niente if-else annidati)
+REM ── Step 7: Scrivi .env ──────────────────────────────────────────────────────
 :STEP7
 echo [7/7] Salvataggio configurazione...
 if exist "%ENV_FILE%" del "%ENV_FILE%"
@@ -748,6 +783,7 @@ if /i "!PROVIDER!"=="trihybrid" (
 ) else if /i "!PROVIDER!"=="bitnet" (
     echo   Motore AI : BITNET CPU-ONLY - !BITNET_MODEL!
     echo   Python    : !PY_BITNET_VER!
+    echo   Clang     : !CLANG_VER!
     echo   Tools     : CHAT/ANALISI ONLY
     echo   Porta     : !BITNET_PORT!
 ) else (
@@ -776,6 +812,7 @@ echo  Avvio BitNet server su porta !BITNET_PORT!...
 set BITNET_LAUNCH_BAT=%TEMP%\bitnet_launch.bat
 (
     echo @echo off
+    echo set "PATH=C:\Program Files\LLVM\bin;%%PATH%%"
     echo call "!VSDEVCMD!" -startdir=none -arch=x64 -host_arch=x64
     echo cd /d "!BITNET_DIR!"
     echo !PYEXE! run_inference.py -m models/BitNet-b1.58-2B-4T/ggml-model-i2_s.gguf -p "You are a helpful trading assistant" --host 127.0.0.1 --port !BITNET_PORT!
