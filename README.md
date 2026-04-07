@@ -1,153 +1,84 @@
-![HyperVibe](https://private-user-images.githubusercontent.com/7491777/571052171-159736d3-af69-4499-a7bb-215ffe463ff6.png)
-
-# HyperVibe by pappardelle.eth 🚀
+# HyperVibe 🚀
 
 **HyperVibe è un agente AI che fa trading autonomo su Hyperliquid per conto tuo.**
 
 Tu gli dici cosa vuoi fare. Lui analizza i mercati, propone i trade, e aspetta la tua approvazione prima di eseguire qualsiasi ordine. Nessun trade parte senza il tuo consenso.
 
-> 🇬🇧 [English version → README.en.md](./README.en.md)
-
 ---
 
 ## Cosa fa concretamente?
 
-- **Analizza** i mercati crypto 24/7 usando indicatori tecnici reali (RSI, MACD, Bollinger Bands)
-- **Propone trade** con ragionamento completo: perché entrare, dove mettere lo stop, dove prendere profitto
-- **Aspetta la tua approvazione** — ogni ordine appare come una scheda con un pulsante Approva / Rifiuta
-- **Gestisce le posizioni** automaticamente con stop-loss e take-profit nativi sull'exchange
-- **Ricerca strategie** tramite backtesting autonomo su qualsiasi perpetual Hyperliquid
-- **Impara** registrando ogni trade con il ragionamento nel giornale
+* **Analizza** i mercati crypto 24/7 usando indicatori tecnici reali (RSI, MACD, Bollinger Bands)
+* **Propone trade** con ragionamento completo: perché entrare, dove mettere lo stop, dove prendere profitto
+* **Aspetta la tua approvazione** — ogni ordine appare come una scheda con un pulsante Approva / Rifiuta
+* **Gestisce le posizioni** automaticamente con stop-loss e take-profit nativi sull'exchange
+* **Impara** registrando ogni trade con il ragionamento nel giornale
+
+Parli con lui in chat come se fosse un trader esperto:
+
+> *"Analizza HYPE sul grafico 4h e dimmi se c'è un'opportunità"*
+> *"Apri un long su BTC con stop a $90.000"*
+> *"Monitora le mie posizioni ogni ora"*
 
 ---
 
-## Come parlare con l'agente
+## Tri-Hybrid Engine 🧠 — Routing AI intelligente
 
-Apri il browser su **http://localhost:3001** e scrivi in chat come se fosse un trader esperto.
+HyperVibe include un motore AI a tre livelli che instrada ogni richiesta al modello più economico in grado di rispondere con qualità sufficiente.
 
-### 📊 Analisi di mercato
 ```
-Analizza HYPE sul grafico 4h e dimmi se c'è un'opportunità
-```
-```
-Calcola RSI, MACD e Bollinger Bands su SOL 1h
-```
-```
-Mostrami i top mover di oggi su Hyperliquid
-```
-```
-Controlla il funding rate su ETH e BTC
-```
-```
-Quanto è il mio account value totale?
+Ogni prompt → Value Score → Tier selezionato
+─────────────────────────────────────────────
+score < 0.30  →  LLaMA locale   (gratis, istantaneo)
+score < 0.60  →  OpenAI GPT     (veloce, economico)
+score ≥ 0.60  →  Anthropic Claude (massima qualità)
 ```
 
-### 📈 Trading
+Il **value score** misura quattro dimensioni del prompt:
+
+| Metrica | Peso | Cosa misura |
+|---|---|---|
+| `reasoning_depth` | 40% | Quanto ragionamento richiede la risposta |
+| `uncertainty` | 30% | Ambiguità e domande aperte |
+| `impact` | 20% | Rilevanza finanziaria / operativa |
+| `complexity` | 10% | Complessità tecnica e linguistica |
+
+Se la risposta del modello selezionato ha **confidenza bassa**, il sistema scala automaticamente al tier superiore (escalation). Il costo di ogni richiesta viene loggato in `tri_hybrid_engine/logs/engine.jsonl`.
+
+### Bridge HTTP (integrazione nativa con HyperVibe)
+
+Il bridge espone un endpoint `/v1/messages` compatibile con l'SDK Anthropic. HyperVibe punta a `http://localhost:3002` invece di `api.anthropic.com` — zero modifiche al codice Node.js.
+
 ```
-Apri un long su BTC con stop a $90.000
-```
-```
-Chiudi il 50% della mia posizione su HYPE
-```
-```
-Imposta leverage 3x su SOL
-```
-```
-Mostrami le mie posizioni aperte e il PnL
-```
-```
-Cancella tutti gli ordini aperti su ETH
+HyperVibe (Node.js :3001)
+        │
+        │  POST /v1/messages
+        ▼
+Tri-Hybrid Bridge (:3002)
+        │
+        ├─ LLaMA  (Ollama locale)
+        ├─ OpenAI GPT
+        └─ Claude
 ```
 
-### 🔬 Autotrade Strategy Research
-```
-Ricerca una strategia su SOL, timeframe 1h, 20 iterazioni
-```
-```
-Avvia autotrade su BTC 4h con 30 iterazioni e profit factor minimo 1.3
-```
-```
-Fai un backtest autonomo su HYPE timeframe 1h
-```
-```
-Mostrami il risultato della ricerca su SOL
-```
-```
-Carica l'ultimo signal disponibile per ETH e proponi il trade
-```
-```
-Avvia autotrade su ETH 1h con drawdown max -20% e leverage max 2x
-```
+**Endpoint disponibili:**
 
-### ⏰ Monitor e automazione
-```
-Monitora le mie posizioni ogni ora
-```
-```
-Crea un alert se HYPE scende sotto $15
-```
-```
-Crea un trigger che scansiona i mercati ogni mattina alle 8:00
-```
-```
-Mostrami il mio journal degli ultimi 7 giorni
-```
-
-### 📋 Playbook e strategie
-```
-Carica il playbook HYPE Momentum Scalp
-```
-```
-Attiva il playbook Autotrade Strategy Research su SOL
-```
-```
-Crea un nuovo playbook per fare funding arbitrage su HYPE
-```
+| Endpoint | Descrizione |
+|---|---|
+| `POST /v1/messages` | Compatibile Anthropic — usato da HyperVibe |
+| `GET  /v1/health` | Stato dei tre tier |
+| `GET  /v1/stats` | Statistiche sessione e costi |
+| `POST /v1/score` | Calcola il value score di un prompt |
 
 ---
 
-## Autotrade Strategy Research 🔬
+## Playbooks 📋 — La tua strategia di trading
 
-Integra [autotrade](https://github.com/rv64m/autotrade) in HyperVibe come pipeline di ricerca autonoma.
+Un Playbook è come un **biglietto di istruzioni** che dai all'agente con scritto tutto quello che deve sapere su di te e sulla tua strategia:
 
-```
-autotrade (backtesting LLM) ──▶ signal JSON ──▶ proposta trade ──▶ tua approvazione ──▶ Hyperliquid
-```
+> *"Ciao, voglio fare trading su HYPE. Non rischiare mai più dell'1% per trade. Usa sempre lo stop loss. Se perdo più del 3% in un giorno, smetti di tradare."*
 
-### Workflow completo dalla chat
-
-**Step 1 — Avvia la ricerca:**
-```
-Ricerca una strategia su SOL, timeframe 1h, 20 iterazioni
-```
-> L'agente risponde: *"Ricerca avviata su SOL (1h, 20 iterazioni). Tempo stimato: ~50 minuti."*
-
-**Step 2 — Carica il risultato:**
-```
-Mostrami il risultato della ricerca su SOL
-```
-> L'agente mostra: Profit Factor, Max Drawdown, Sharpe, SL%, TP%, Leverage, Size.
-
-**Step 3 — Proposta trade:**
-```
-Proponi il trade basato sul signal SOL
-```
-> Appare la scheda con **Approva / Rifiuta**.
-
-**Step 4 — Approvi → trade live.**
-
-### Timeframe e storia disponibile
-
-| Timeframe | Storia su Hyperliquid |
-|-----------|-----------------------|
-| 15m | ~52 giorni |
-| 1h | ~208 giorni |
-| 4h | ~833 giorni |
-| 1d | ~13 anni |
-
----
-
-## Playbooks 📋
+L'agente legge questo biglietto **ogni volta** che si sveglia — così si comporta sempre in modo coerente con la tua strategia, senza che tu debba rispiegare tutto da capo.
 
 **Playbook disponibili nel Playbook Store:**
 
@@ -158,12 +89,12 @@ Proponi il trade basato sul signal SOL
 | BTC/ETH Trend Follower | Swing trade macro, 1-5 giorni |
 | OpenClaw Autonomous | Pipeline completo automatico |
 | Top Mover Breakout | Scan mattutino, breakout del giorno |
-| HYPE Fee Monitor & Burn Predictor | Monitor onchain HAF fees, segnali BOUNCE_HIGH / BURN_SPIKE |
-| **Autotrade Strategy Research** ⭐ | Ricerca autonoma strategie via backtesting LLM su qualsiasi perpetual |
 
 ---
 
-## Skills 🛠️
+## Skills 🛠️ — Le tecniche dell'agente
+
+Una Skill è un **manuale tecnico** che insegni all'agente una volta sola.
 
 **Skill disponibili nello Skill Store:**
 
@@ -184,7 +115,8 @@ Proponi il trade basato sul signal SOL
 | **Anthropic API key** | [console.anthropic.com](https://console.anthropic.com) |
 | **Wallet Hyperliquid** | [app.hyperliquid.xyz](https://app.hyperliquid.xyz) |
 | **PC Windows** con internet | — |
-| **Claude Code CLI** *(per Autotrade)* | Installato automaticamente dall'installer |
+| *(opzionale)* **OpenAI API key** | [platform.openai.com](https://platform.openai.com) — per il tier medio del Tri-Hybrid |
+| *(opzionale)* **Ollama** | [ollama.ai](https://ollama.ai) — per il tier locale gratuito |
 
 ---
 
@@ -193,21 +125,17 @@ Proponi il trade basato sul signal SOL
 Apri il **Prompt dei comandi (CMD)** e incolla questo:
 
 ```
-powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/mikeminer/HyperVibe/main/installer.bat' -OutFile installer.bat" && installer.bat
+powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/mikeminer/HyperVibe/main/installer.bat' -OutFile install-hypervibe.bat" && install-hypervibe.bat
 ```
 
-**Come aprire il CMD:** premi **Windows + R** → scrivi `cmd` → premi Invio → incolla il comando.
-
-L'installer v3.2 fa tutto da solo:
+Il programma fa tutto da solo:
 
 1. Installa Node.js se non ce l'hai
 2. Installa Git se non ce l'hai
-3. Scarica HyperVibe da GitHub (con submodule autotrade)
-4. Chiede se installare il modulo **Autotrade Strategy Research** *(opzionale, ~200MB)*
-5. Installa Claude Code CLI per il loop LLM *(se Autotrade è selezionato)*
-6. Scelta motore AI: Anthropic API, Qwen 2.5 14B locale, o Gemma 4 26B locale
-7. Ti chiede le credenziali (API key, wallet, chiave privata)
-8. Avvia il programma e apre il browser
+3. Scarica HyperVibe da GitHub
+4. Ti chiede le credenziali (API key, wallet, chiave privata)
+5. **Scelta motore AI:** Anthropic / Qwen locale / Gemma locale / **Tri-Hybrid** ← nuovo
+6. Avvia il programma e apre il browser
 
 ---
 
@@ -216,7 +144,7 @@ L'installer v3.2 fa tutto da solo:
 | # | Primitiva | Ruolo |
 |---|---|---|
 | 01 | **Market Tooling** | 20 tool: prezzi live, candele, indicatori, funding, orderbook, posizioni |
-| 02 | **Heartbeat** | Loop di monitoraggio ogni 30s — sveglia l'agente solo quando serve |
+| 02 | **Heartbeat** | Loop di monitoraggio ogni 30s |
 | 03 | **Triggers** | Condizione + azione: stop-loss automatici, scan mattutini, alert |
 | 04 | **Permissions** | Gate di approvazione — nessun trade senza il tuo consenso |
 | 05 | **Playbooks** | Documento di strategia caricato ad ogni run dell'agente |
@@ -224,23 +152,12 @@ L'installer v3.2 fa tutto da solo:
 
 ---
 
-## Motori AI supportati
-
-| Motore | Tipo | Note |
-|---|---|---|
-| **Anthropic API** | Cloud | Claude Sonnet, qualità massima, a pagamento |
-| **Qwen 2.5 14B** | Locale | Gratuito, ~9GB RAM, consigliato per uso quotidiano |
-| **Gemma 4 26B MoE** | Locale | Gratuito, ~20GB RAM, alta qualità |
-
----
-
 ## Sicurezza
 
-- La tua chiave privata **non lascia mai il tuo computer**
-- Tutti gli ordini passano per il tuo consenso esplicito
-- Nessun trade parte automaticamente senza che tu premi Approva
-- I dati sono salvati solo in locale
-- Per Autotrade: usa sempre l'**API wallet** di Hyperliquid, mai la chiave principale
+* La tua chiave privata **non lascia mai il tuo computer**
+* Tutti gli ordini passano per il tuo consenso esplicito
+* Nessun trade parte automaticamente senza che tu premi Approva
+* I dati sono salvati solo in locale (`~/.hypervibe/`)
 
 ---
 
@@ -248,7 +165,7 @@ L'installer v3.2 fa tutto da solo:
 
 Il browser si apre su **http://localhost:3001**
 
-Per riavviare HyperVibe: doppio click su **StartHyperVibe.bat** nella cartella di installazione.
+Per riavviare HyperVibe: doppio click su **INSTALL_v3.4.bat** nella cartella della repo.
 
 ---
 
