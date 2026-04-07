@@ -314,21 +314,39 @@ set BITNET_OK=
 set /p BITNET_OK="  Continuare con BitNet? (S/N): "
 if /i "!BITNET_OK!" neq "S" goto STEP5
 
-REM ·· Cerca VsDevCmd.bat via PowerShell (evita path hardcoded con spazi) ·······
+REM ·· Cerca VsDevCmd.bat via PowerShell ·······································
 echo.
 echo  [*] Ricerca Visual Studio 2022...
 set VSDEVCMD=
 for /f "usebackq delims=" %%P in (`powershell -NoProfile -Command "Get-ChildItem 'C:\Program Files\Microsoft Visual Studio\2022' -Recurse -Filter VsDevCmd.bat -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName" 2^>nul`) do set VSDEVCMD=%%P
 
 if "!VSDEVCMD!"=="" (
-    echo.
-    echo  ERRORE: Visual Studio 2022 non trovato.
-    echo  Installa VS2022 Community con workload "Sviluppo desktop C++" da:
-    echo  https://visualstudio.microsoft.com/it/downloads/
-    echo  Dopo l'installazione riesegui questo installer.
-    echo.
-    pause
-    goto STEP5
+    echo  Visual Studio 2022 non trovato. Installazione via winget...
+    winget --version >nul 2>&1
+    if %errorlevel% neq 0 (
+        echo  ERRORE: winget non disponibile.
+        echo  Installa VS2022 Community manualmente da:
+        echo  https://visualstudio.microsoft.com/vs/community/
+        echo  Workload richiesto: "Sviluppo desktop con C++"
+        pause
+        goto STEP5
+    )
+    winget install Microsoft.VisualStudio.2022.Community --silent --override "--wait --quiet --add Microsoft.VisualStudio.Workload.NativeDesktop --includeRecommended"
+    if %errorlevel% neq 0 (
+        echo  ERRORE: Installazione VS2022 fallita.
+        echo  Installa manualmente da:
+        echo  https://visualstudio.microsoft.com/vs/community/
+        pause
+        goto STEP5
+    )
+    echo  OK - VS2022 Community installato. Ricerco VsDevCmd.bat...
+    for /f "usebackq delims=" %%P in (`powershell -NoProfile -Command "Get-ChildItem 'C:\Program Files\Microsoft Visual Studio\2022' -Recurse -Filter VsDevCmd.bat -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName" 2^>nul`) do set VSDEVCMD=%%P
+    if "!VSDEVCMD!"=="" (
+        echo  ERRORE: VsDevCmd.bat non trovato anche dopo installazione.
+        echo  Riavvia il PC e riesegui l'installer.
+        pause
+        goto STEP5
+    )
 )
 echo  OK - Trovato: !VSDEVCMD!
 
