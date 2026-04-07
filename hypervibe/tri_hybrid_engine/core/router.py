@@ -149,6 +149,16 @@ class TriHybridRouter:
                 self._logger.warning(
                     f"[{record.request_id}] {current_tier} failed: {response.error}"
                 )
+                # Mark tier as unhealthy if quota/auth error — skip it for rest of session
+                error_str = str(response.error or "")
+                if any(k in error_str for k in [
+                    "insufficient_quota", "429", "401", "credit balance",
+                    "exceeded your current quota", "invalid_api_key"
+                ]):
+                    self._healthy[current_tier] = False
+                    self._logger.warning(
+                        f"[{current_tier}] marked UNHEALTHY for this session: quota/auth error"
+                    )
                 next_idx = current_tier_idx + 1
                 if next_idx >= len(TIER_ORDER):
                     # All tiers exhausted — return empty with error
