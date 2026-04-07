@@ -161,17 +161,17 @@ if %errorlevel% neq 0 (
 )
 echo  OK - @nktkas/hyperliquid ed ethers installati
 
-echo  Installazione Claude Code CLI...
-claude --version >nul 2>&1
-if %errorlevel% equ 0 (
-    echo  OK - Claude Code CLI gia' presente
-) else (
-    call npm install -g @anthropic-ai/claude-code --silent
-    if %errorlevel% neq 0 (
-        echo  ATTENZIONE: Claude Code CLI non installato.
-        echo  Installa manualmente: npm install -g @anthropic-ai/claude-code
-    ) else (
-        echo  OK - Claude Code CLI installato
+//  echo  Installazione Claude Code CLI...
+//  claude --version >nul 2>&1
+//  if %errorlevel% equ 0 (
+//   echo  OK - Claude Code CLI gia' presente
+//  ) else (
+//  call npm install -g @anthropic-ai/claude-code --silent
+ // if %errorlevel% neq 0 (
+//      echo  ATTENZIONE: Claude Code CLI non installato.
+//       echo  Installa manualmente: npm install -g @anthropic-ai/claude-code
+//    ) else (
+//        echo  OK - Claude Code CLI installato
     )
 )
 
