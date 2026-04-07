@@ -95,7 +95,7 @@ set _SKIP_CLONE=0
 if "!ALREADY_CLONED!"=="1" (
     echo  Repo gia' presente - salto clone.
     git -C "%HV_DIR%" pull >nul 2>&1
-    echo  OK - Aggiornato ^(o non-git, proseguo^)
+    echo  OK - Aggiornato
     set _SKIP_CLONE=1
 )
 if "!_SKIP_CLONE!"=="0" if exist "%APP_DIR%\package.json" (
@@ -140,14 +140,10 @@ echo  Cartella tools creata: %TOOLS_DIR%
 echo  Inizializzazione submodule autotrade...
 cd /d "%HV_DIR%"
 git submodule update --init --recursive
-if %errorlevel% neq 0 (
-    echo  ERRORE: submodule update fallito. Continuo senza modulo.
-    goto STEP5
-)
+if %errorlevel% neq 0 ( echo  ERRORE: submodule update fallito. Continuo senza modulo. & goto STEP5 )
 echo  OK - autotrade submodule inizializzato
 
 if not exist "%TOOLS_DIR%\package.json" (
-    echo  Inizializzazione package.json tools...
     (
         echo {
         echo   "name": "hypervibe-autotrade-tools",
@@ -158,35 +154,17 @@ if not exist "%TOOLS_DIR%\package.json" (
     ) > "%TOOLS_DIR%\package.json"
 )
 
-echo  Installazione @nktkas/hyperliquid ed ethers...
 cd /d "%TOOLS_DIR%"
 call npm install @nktkas/hyperliquid@latest ethers@latest --silent
-if %errorlevel% neq 0 (
-    echo  ERRORE: npm install tools fallito. Continuo senza modulo.
-    goto STEP5
-)
+if %errorlevel% neq 0 ( echo  ERRORE: npm install tools fallito. Continuo senza modulo. & goto STEP5 )
 echo  OK - @nktkas/hyperliquid ed ethers installati
 
-echo  Verifica Claude Code CLI...
 call claude --version >nul 2>&1
 if %errorlevel% equ 0 goto CLAUDE_OK
-
-call npm.cmd --version >nul 2>&1
-if %errorlevel% neq 0 (
-    echo  ERRORE: npm non trovato. Installa Node.js prima di continuare.
-    pause & exit /b 1
-)
 call npm.cmd install -g @anthropic-ai/claude-code --silent
-if %errorlevel% neq 0 (
-    echo  ATTENZIONE: Claude Code CLI non installato.
-    echo  Installa manualmente: npm install -g @anthropic-ai/claude-code
-    pause & exit /b 1
-)
+if %errorlevel% neq 0 ( echo  ATTENZIONE: Claude Code CLI non installato. & pause & exit /b 1 )
 call claude --version >nul 2>&1
-if %errorlevel% neq 0 (
-    echo  ERRORE: Claude Code CLI non disponibile. Riapri il terminale e riesegui.
-    pause & exit /b 1
-)
+if %errorlevel% neq 0 ( echo  ERRORE: Riapri il terminale e riesegui. & pause & exit /b 1 )
 
 :CLAUDE_OK
 echo  OK - Claude Code CLI trovato
@@ -194,14 +172,7 @@ echo  OK - Claude Code CLI trovato
 set MISSING_SCRIPTS=0
 if not exist "%TOOLS_DIR%\autotrade-bridge.js" set MISSING_SCRIPTS=1
 if not exist "%TOOLS_DIR%\signal-loader.js"    set MISSING_SCRIPTS=1
-if "!MISSING_SCRIPTS!"=="1" (
-    echo.
-    echo  ATTENZIONE: autotrade-bridge.js e/o signal-loader.js non trovati in:
-    echo   %TOOLS_DIR%
-    echo.
-) else (
-    echo  OK - autotrade-bridge.js e signal-loader.js presenti
-)
+if "!MISSING_SCRIPTS!"=="1" ( echo. & echo  ATTENZIONE: autotrade-bridge.js e/o signal-loader.js non trovati. & echo. )
 
 mkdir "%APP_DIR%\playbooks\signals" >nul 2>&1
 echo  OK - Cartella playbooks\signals creata
@@ -231,7 +202,6 @@ REM ── Solo API ────────────────────
 set PROVIDER=anthropic
 set OLLAMA_MODEL=
 set CLAUDE_MODEL=claude-sonnet-4-20250514
-set NEED_OLLAMA=0
 set CUR_ANTHROPIC=
 if exist "%ENV_FILE%" for /f "usebackq tokens=1,* delims==" %%a in ("%ENV_FILE%") do if "%%a"=="ANTHROPIC_API_KEY" set CUR_ANTHROPIC=%%b
 echo.
@@ -241,8 +211,6 @@ if "!NEW_A!"=="" (set FINAL_A=!CUR_ANTHROPIC!) else (set FINAL_A=!NEW_A!)
 goto STEP6
 
 REM ── Solo Locale: sottomenu modello (Ollama) ───────────────────────────────────
-REM  Tutti i modelli elencati supportano tools/function calling su Ollama.
-REM  Esclusi: deepseek-r1:*, qwq:* (HTTP 400 tools not supported).
 :AI_LOCAL_MENU
 echo.
 echo   Tutti i modelli elencati supportano tools/function calling.
@@ -275,7 +243,7 @@ echo   [20] Mixtral 8x7B          - mixtral:8x7b          ~30GB
 echo   [21] Llama 3.1 70B         - llama3.1:70b          ~48GB
 echo   [22] Qwen3 72B             - qwen3:72b             ~48GB
 echo.
-echo   [23] Nome custom (inserisci tag Ollama manualmente)
+echo   [23] Nome custom
 echo.
 set LOCAL_CHOICE=
 :ASK_LOCAL
@@ -302,11 +270,7 @@ if "!LOCAL_CHOICE!"=="19" ( set OLLAMA_MODEL=qwen2.5:32b           & set FORCE_U
 if "!LOCAL_CHOICE!"=="20" ( set OLLAMA_MODEL=mixtral:8x7b          & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
 if "!LOCAL_CHOICE!"=="21" ( set OLLAMA_MODEL=llama3.1:70b          & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
 if "!LOCAL_CHOICE!"=="22" ( set OLLAMA_MODEL=qwen3:72b             & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
-if "!LOCAL_CHOICE!"=="23" (
-    set /p OLLAMA_MODEL="  Tag Ollama (es. qwen3:30b-a3b): "
-    set FORCE_UPDATE_OLLAMA=0
-    goto LOCAL_OK
-)
+if "!LOCAL_CHOICE!"=="23" ( set /p OLLAMA_MODEL="  Tag Ollama: " & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
 goto ASK_LOCAL
 
 :LOCAL_OK
@@ -316,7 +280,12 @@ set CLAUDE_MODEL=
 echo  OK - Selezionato: !OLLAMA_MODEL!
 goto OLLAMA_SETUP
 
-REM ── BitNet CPU Engine (Microsoft 1-bit LLM) ───────────────────────────────────
+REM ── BitNet CPU Engine ────────────────────────────────────────────────────────
+REM  Strategia anti-crash:
+REM  - Nessun cmd /c con virgolette annidate
+REM  - VS detection via powershell (piu' robusto)
+REM  - Build step scritto in bat temporaneo e chiamato via call
+REM  - Ogni errore fa goto STEP5 invece di exit
 :AI_BITNET
 set PROVIDER=bitnet
 set OLLAMA_MODEL=
@@ -328,80 +297,62 @@ set BITNET_DIR=%HV_DIR%\bitnet
 
 echo.
 echo  ── BITNET CPU ENGINE ────────────────────────────────────────────────────
-echo   Inferenza 1-bit nativa, nessuna GPU richiesta.
-echo   Modello: BitNet b1.58 2B4T (~1.2GB)
-echo   Vantaggi: 82%% risparmio energetico, fino a 6x piu' veloce su CPU x86
+echo   Inferenza 1-bit nativa Microsoft, nessuna GPU richiesta.
+echo   Modello: BitNet b1.58 2B4T, circa 1.2GB, solo CPU.
+echo   Vantaggi: 82 percento risparmio energetico, fino a 6x piu' veloce su x86.
 echo.
 echo   ATTENZIONE: tool/function calling NON ancora supportato ufficialmente.
 echo   HyperVibe funzionera' in modalita' CHAT/ANALISI:
 echo     Segnali e analisi testuali : OK
 echo     Esecuzione ordini autonoma : NON DISPONIBILE
 echo.
-echo   PREREQUISITI RICHIESTI (installazione manuale se assenti):
-echo     - Visual Studio 2022 Community/BuildTools con "Sviluppo C++"
-echo       https://visualstudio.microsoft.com/it/downloads/
-echo     - CMake 3.22+  (winget install Kitware.CMake)
-echo     - Python 3.9+  (gia' verificato al passo precedente)
-echo     - Hugging Face CLI  (pip install huggingface_hub[cli])
+echo   PREREQUISITO OBBLIGATORIO (da installare prima se assente):
+echo     Visual Studio 2022 con workload "Sviluppo desktop C++"
+echo     Scarica da: https://visualstudio.microsoft.com/it/downloads/
 echo.
+set BITNET_OK=
 set /p BITNET_OK="  Continuare con BitNet? (S/N): "
 if /i "!BITNET_OK!" neq "S" goto STEP5
 
-REM ·· Verifica VS2022 - solo check, NO auto-install ····························
+REM ·· Cerca VsDevCmd.bat via PowerShell (evita path hardcoded con spazi) ·······
 echo.
-echo  [*] Verifica Visual Studio 2022...
-set VS_CMD=
-if exist "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat"   set "VS_CMD=C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat"
-if exist "C:\Program Files\Microsoft Visual Studio\2022\Professional\Common7\Tools\VsDevCmd.bat" set "VS_CMD=C:\Program Files\Microsoft Visual Studio\2022\Professional\Common7\Tools\VsDevCmd.bat"
-if exist "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"   set "VS_CMD=C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
-if exist "C:\Program Files\Microsoft Visual Studio\2022\BuildTools\Common7\Tools\VsDevCmd.bat"   set "VS_CMD=C:\Program Files\Microsoft Visual Studio\2022\BuildTools\Common7\Tools\VsDevCmd.bat"
+echo  [*] Ricerca Visual Studio 2022...
+set VSDEVCMD=
+for /f "usebackq delims=" %%P in (`powershell -NoProfile -Command "Get-ChildItem 'C:\Program Files\Microsoft Visual Studio\2022' -Recurse -Filter VsDevCmd.bat -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName" 2^>nul`) do set VSDEVCMD=%%P
 
-if "!VS_CMD!"=="" (
+if "!VSDEVCMD!"=="" (
     echo.
     echo  ERRORE: Visual Studio 2022 non trovato.
-    echo  Installa Visual Studio 2022 Community (gratuito) con il workload
-    echo  "Sviluppo di applicazioni desktop con C++" da:
+    echo  Installa VS2022 Community con workload "Sviluppo desktop C++" da:
     echo  https://visualstudio.microsoft.com/it/downloads/
-    echo.
     echo  Dopo l'installazione riesegui questo installer.
+    echo.
     pause
     goto STEP5
 )
-echo  OK - VS2022 trovato: !VS_CMD!
-
-REM ·· Inizializza ambiente VS (senza call che puo' crashare la sessione) ········
-echo  [*] Inizializzazione ambiente di build...
-cmd /c "call "!VS_CMD!" -startdir=none -arch=x64 -host_arch=x64 && cmake --version" >nul 2>&1
-if %errorlevel% neq 0 (
-    echo  ERRORE: Impossibile inizializzare l'ambiente VS2022.
-    echo  Esegui questo installer dallo "Developer Command Prompt for VS 2022".
-    pause
-    goto STEP5
-)
-echo  OK - Ambiente VS2022 inizializzato
+echo  OK - Trovato: !VSDEVCMD!
 
 REM ·· CMake ····················································
 echo  [*] Verifica CMake...
 cmake --version >nul 2>&1
 if %errorlevel% neq 0 (
-    echo  CMake non trovato. Installazione via winget...
+    echo  Installazione CMake via winget...
     winget install --id Kitware.CMake --silent --accept-package-agreements --accept-source-agreements >nul 2>&1
     set "PATH=C:\Program Files\CMake\bin;%PATH%"
     cmake --version >nul 2>&1
     if %errorlevel% neq 0 (
-        echo  ERRORE: CMake non installato. Installa manualmente da https://cmake.org
+        echo  ERRORE: CMake non trovato. Installa da https://cmake.org e riesegui.
         pause
         goto STEP5
     )
 )
-for /f "tokens=3" %%v in ('cmake --version 2^>nul ^| findstr /i "version"') do set CMAKE_VER=%%v
-echo  OK - CMake !CMAKE_VER!
+echo  OK - CMake trovato
 
 REM ·· Python + huggingface-cli ·················································
 echo  [*] Installazione huggingface-cli...
 python -m pip install "huggingface_hub[cli]" --quiet 2>nul
 if %errorlevel% neq 0 (
-    echo  ERRORE: pip install huggingface_hub fallito.
+    echo  ERRORE: pip install huggingface_hub fallito. Controlla Python e pip.
     pause
     goto STEP5
 )
@@ -409,9 +360,9 @@ echo  OK - huggingface-cli pronto
 
 REM ·· Clone microsoft/BitNet ···················································
 echo  [*] Verifica BitNet repo...
-if not exist "!BITNET_DIR!\setup_env.py" (
-    echo  Clone microsoft/BitNet con submoduli (~500MB)...
-    git clone --recursive https://github.com/microsoft/BitNet.git "!BITNET_DIR!"
+if not exist "%BITNET_DIR%\setup_env.py" (
+    echo  Clone microsoft/BitNet con submoduli, circa 500MB...
+    git clone --recursive https://github.com/microsoft/BitNet.git "%BITNET_DIR%"
     if %errorlevel% neq 0 (
         echo  ERRORE: Clone BitNet fallito. Controlla la connessione internet.
         pause
@@ -420,55 +371,59 @@ if not exist "!BITNET_DIR!\setup_env.py" (
     echo  OK - BitNet clonato
 ) else (
     echo  OK - BitNet gia' presente, aggiorno...
-    git -C "!BITNET_DIR!" pull >nul 2>&1
-    git -C "!BITNET_DIR!" submodule update --recursive >nul 2>&1
+    git -C "%BITNET_DIR%" pull >nul 2>&1
+    git -C "%BITNET_DIR%" submodule update --recursive >nul 2>&1
 )
 
 REM ·· Dipendenze Python BitNet ·················································
 echo  [*] Installazione requirements.txt BitNet...
-cd /d "!BITNET_DIR!"
+cd /d "%BITNET_DIR%"
 python -m pip install -r requirements.txt --quiet
 if %errorlevel% neq 0 (
     echo  ERRORE: pip install requirements.txt fallito.
     pause
     goto STEP5
 )
-echo  OK - Dipendenze Python BitNet installate
+echo  OK - Dipendenze BitNet installate
 
-REM ·· Build + download modello (lanciato dentro Developer Command Prompt) ······
+REM ·· Scrivi bat temporaneo per la build (evita virgolette annidate) ············
+set BITNET_BUILD_BAT=%TMP_DIR%\bitnet_build.bat
+echo @echo off > "%BITNET_BUILD_BAT%"
+echo call "!VSDEVCMD!" -startdir=none -arch=x64 -host_arch=x64 >> "%BITNET_BUILD_BAT%"
+echo if errorlevel 1 exit /b 1 >> "%BITNET_BUILD_BAT%"
+echo cd /d "%BITNET_DIR%" >> "%BITNET_BUILD_BAT%"
+echo python setup_env.py -md models/BitNet-b1.58-2B-4T -q i2_s >> "%BITNET_BUILD_BAT%"
+echo exit /b %errorlevel% >> "%BITNET_BUILD_BAT%"
+
 echo.
-echo  [*] Download BitNet b1.58 2B4T + compilazione kernel...
-echo      (download ~1.2GB + build, richiede 5-15 minuti)
-echo      IMPORTANTE: se la build fallisce, riesegui dallo
-echo      "Developer Command Prompt for VS 2022" e lancia manualmente:
-echo      cd !BITNET_DIR! ^&^& python setup_env.py -md models/BitNet-b1.58-2B-4T -q i2_s
+echo  [*] Build BitNet + download modello, circa 1.2GB...
+echo      Questa fase richiede 5-15 minuti. Attendi.
 echo.
-cmd /c "call "!VS_CMD!" -startdir=none -arch=x64 -host_arch=x64 && cd /d "!BITNET_DIR!" && python setup_env.py -md models/BitNet-b1.58-2B-4T -q i2_s"
+call "%BITNET_BUILD_BAT%"
 if %errorlevel% neq 0 (
     echo.
-    echo  ERRORE: setup_env.py fallito.
-    echo  Prova a eseguire manualmente dallo Developer Command Prompt VS2022:
-    echo    cd !BITNET_DIR!
+    echo  ERRORE: Build BitNet fallita.
+    echo  Prova manualmente dallo "Developer Command Prompt for VS 2022":
+    echo    cd %BITNET_DIR%
     echo    python setup_env.py -md models/BitNet-b1.58-2B-4T -q i2_s
+    echo.
     pause
     goto STEP5
 )
+del "%BITNET_BUILD_BAT%" >nul 2>&1
 echo  OK - BitNet compilato e modello pronto
-echo  OK - BitNet Engine configurato
 goto STEP6
 
-REM ── Ollama setup condiviso (Solo Locale) ─────────────────────────────────────
+REM ── Ollama setup condiviso ───────────────────────────────────────────────────
 :OLLAMA_SETUP
 echo.
 echo  Verifica Ollama...
 ollama --version >nul 2>&1
 if %errorlevel% neq 0 goto INSTALL_OLLAMA
-
 if "!FORCE_UPDATE_OLLAMA!"=="1" (
     ollama --version > "%TMP_DIR%\olv.txt" 2>&1
     node -e "var s=require('fs').readFileSync(process.env.TEMP+'\\hypervibe_install\\olv.txt','utf8');var m=s.match(/(\d+)\.(\d+)/);process.exit(!m||parseInt(m[2])<20?1:0);" >nul 2>&1
     if !errorlevel! equ 0 ( echo  OK - Ollama gia' aggiornato & goto OLLAMA_READY )
-    echo  Aggiornamento Ollama per gemma4...
     goto INSTALL_OLLAMA
 )
 goto OLLAMA_READY
@@ -477,7 +432,6 @@ goto OLLAMA_READY
 echo  Download Ollama...
 curl -L --progress-bar -o "%TMP_DIR%\OllamaSetup.exe" "https://ollama.com/download/OllamaSetup.exe"
 if %errorlevel% neq 0 ( echo  ERRORE: Download Ollama fallito. & pause & exit /b 1 )
-echo  Installazione Ollama...
 "%TMP_DIR%\OllamaSetup.exe" /S
 ping -n 10 127.0.0.1 >nul 2>&1
 set "PATH=%LOCALAPPDATA%\Programs\Ollama;%PATH%"
@@ -496,9 +450,7 @@ ollama pull !OLLAMA_MODEL!
 if %errorlevel% neq 0 ( echo  ERRORE: Download modello fallito. & pause & exit /b 1 )
 echo  OK - !OLLAMA_MODEL! scaricato
 
-REM ────────────────────────────────────────────────────────────────────────────
-REM [4] TRI-HYBRID ENGINE
-REM ────────────────────────────────────────────────────────────────────────────
+REM ── Tri-Hybrid Engine ────────────────────────────────────────────────────────
 :AI_TRIHYBRID
 set PROVIDER=trihybrid
 set OLLAMA_MODEL=
@@ -515,77 +467,53 @@ set THY_MAX_ESC=2
 
 echo.
 echo  ── TRI-HYBRID ENGINE ────────────────────────────────────────────────────
-echo   Routing automatico: LLaMA (locale) - GPT (media complessita') - Claude (massima)
-echo   Il motore calcola un value_score per ogni prompt e sceglie il modello
-echo   piu' economico in grado di rispondere con confidenza sufficiente.
+echo   Routing automatico: LLaMA locale / OpenAI GPT / Claude
 echo.
 
-REM ·· Python 3.11+ ·············································
 echo  [*] Verifica Python 3.11+...
 python --version >nul 2>&1
 if %errorlevel% neq 0 (
     winget install --id Python.Python.3.12 --silent --accept-package-agreements --accept-source-agreements
     set "PATH=%LOCALAPPDATA%\Programs\Python\Python312;%LOCALAPPDATA%\Programs\Python\Python312\Scripts;%PATH%"
-    python --version >nul 2>&1
-    if %errorlevel% neq 0 ( echo  ERRORE: Installa Python 3.11+ da https://python.org & pause & exit /b 1 )
 )
 python -c "import sys; sys.exit(0 if sys.version_info>=(3,11) else 1)" >nul 2>&1
 if %errorlevel% neq 0 ( echo  ERRORE: Python 3.11+ richiesto. & pause & exit /b 1 )
 for /f "tokens=2" %%v in ('python --version 2^>^&1') do set PY_VER=%%v
 echo  OK - Python %PY_VER%
 
-REM ·· Copia tri_hybrid_engine ··················································
-echo  [*] Verifica cartella Tri-Hybrid Engine...
 if not exist "%THY_DIR%\main.py" (
     if exist "%INSTALL_DIR%\tri_hybrid_engine\main.py" (
         xcopy "%INSTALL_DIR%\tri_hybrid_engine" "%THY_DIR%" /E /I /Q >nul 2>&1
-        echo  OK - Engine copiato in %THY_DIR%
+        echo  OK - Engine copiato
     ) else (
-        echo  ATTENZIONE: tri_hybrid_engine\ non trovato accanto all'installer.
+        echo  ATTENZIONE: tri_hybrid_engine\ non trovato. Premi un tasto e ritenta.
         pause
         if not exist "%THY_DIR%\main.py" ( echo  ERRORE: Engine non trovato. & pause & exit /b 1 )
     )
-) else (
-    echo  OK - Engine gia' presente in %THY_DIR%
-)
+) else ( echo  OK - Engine presente )
 
-REM ·· Dipendenze Python ·······················································
-echo  [*] Installazione dipendenze Python...
 python -m ensurepip --upgrade --user >nul 2>&1
-python -m pip --version >nul 2>&1
-if %errorlevel% neq 0 (
-    curl -L --progress-bar -o "%TMP_DIR%\get-pip.py" "https://bootstrap.pypa.io/get-pip.py"
-    python "%TMP_DIR%\get-pip.py" --user --quiet
-)
 python -m pip install --upgrade pip --user --quiet 2>nul
 python -m pip install "anthropic>=0.40.0" "openai>=1.50.0" "aiohttp>=3.9.0" "fastapi>=0.115.0" "uvicorn>=0.30.0" --user --quiet
 if %errorlevel% neq 0 ( echo  ERRORE: pip install fallito. & pause & exit /b 1 )
-echo  OK - anthropic, openai, aiohttp installati
+echo  OK - Dipendenze Python installate
 
-REM ·· Ollama + LLaMA locale ···················································
 echo.
-echo  [*] Vuoi usare un modello LLaMA locale come tier economico?
-echo      (Senza LLaMA, il tier base sara' OpenAI GPT)
-echo.
+echo  Installare Ollama + LLaMA come tier economico? (senza: tier base = OpenAI)
 set INSTALL_OLLAMA_THY=
-set /p INSTALL_OLLAMA_THY="  Installare Ollama + LLaMA? (S/N): "
+set /p INSTALL_OLLAMA_THY="  (S/N): "
 if /i "!INSTALL_OLLAMA_THY!"=="S" (
     ollama --version >nul 2>&1
     if %errorlevel% neq 0 (
         curl -L --progress-bar -o "%TMP_DIR%\OllamaSetup.exe" "https://ollama.com/download/OllamaSetup.exe"
-        if %errorlevel% neq 0 ( echo  ERRORE: Download Ollama fallito. & pause & exit /b 1 )
         "%TMP_DIR%\OllamaSetup.exe" /S
         ping -n 10 127.0.0.1 >nul 2>&1
         set "PATH=%LOCALAPPDATA%\Programs\Ollama;%PATH%"
     )
     echo.
-    echo  Modelli disponibili per tier LLaMA (tutti con tools support):
-    echo   [1] llama3.2:3b    (2GB  - leggero)
-    echo   [2] llama3.1:8b    (5GB  - bilanciato, consigliato)
-    echo   [3] qwen3:8b       (5GB  - alternativa capace)
-    echo   [4] mistral:7b     (4GB  - veloce)
-    echo   [5] qwen2.5:14b    (9GB  - qualita' alta)
-    echo   [6] Nome custom
+    echo   [1] llama3.2:3b  2GB   [2] llama3.1:8b  5GB (consigliato)
+    echo   [3] qwen3:8b     5GB   [4] mistral:7b   4GB
+    echo   [5] qwen2.5:14b  9GB   [6] custom
     echo.
     set LLAMA_PICK=
     set /p LLAMA_PICK="  Scelta [1-6]: "
@@ -595,51 +523,34 @@ if /i "!INSTALL_OLLAMA_THY!"=="S" (
     if "!LLAMA_PICK!"=="4" set THY_LLAMA_MODEL=mistral:7b
     if "!LLAMA_PICK!"=="5" set THY_LLAMA_MODEL=qwen2.5:14b
     if "!LLAMA_PICK!"=="6" set /p THY_LLAMA_MODEL="  Nome modello: "
-    echo  Download !THY_LLAMA_MODEL!...
     start /B ollama serve >nul 2>&1
     ping -n 5 127.0.0.1 >nul 2>&1
     ollama pull !THY_LLAMA_MODEL!
-    if %errorlevel% neq 0 (
-        echo  ATTENZIONE: pull fallito. Il tier base sara' OpenAI.
-    ) else (
-        echo  OK - !THY_LLAMA_MODEL! scaricato
-        set OLLAMA_MODEL=!THY_LLAMA_MODEL!
-    )
+    if %errorlevel% equ 0 ( set OLLAMA_MODEL=!THY_LLAMA_MODEL! & echo  OK - !THY_LLAMA_MODEL! scaricato )
 )
 
-REM ·· API Keys ·················································
-echo.
-echo  Inserisci le API Key per i tier cloud (lascia vuoto per saltare il tier).
 echo.
 set CUR_A=
 set CUR_OAI=
-if exist "%ENV_FILE%" (
-    for /f "usebackq tokens=1,* delims==" %%a in ("%ENV_FILE%") do (
-        if "%%a"=="ANTHROPIC_API_KEY" set CUR_A=%%b
-        if "%%a"=="OPENAI_API_KEY"    set CUR_OAI=%%b
-    )
+if exist "%ENV_FILE%" for /f "usebackq tokens=1,* delims==" %%a in ("%ENV_FILE%") do (
+    if "%%a"=="ANTHROPIC_API_KEY" set CUR_A=%%b
+    if "%%a"=="OPENAI_API_KEY"    set CUR_OAI=%%b
 )
-if not "!CUR_A!"==""   echo  Anthropic attuale : !CUR_A:~0,20!...
-set /p NEW_A="  Anthropic API Key (sk-ant-...) [INVIO per mantenere]: "
+if not "!CUR_A!"==""   echo  Anthropic attuale: !CUR_A:~0,20!...
+set /p NEW_A="  Anthropic API Key [INVIO per mantenere]: "
 if "!NEW_A!"=="" (set FINAL_A=!CUR_A!) else (set FINAL_A=!NEW_A!)
-
-if not "!CUR_OAI!"=="" echo  OpenAI attuale    : !CUR_OAI:~0,20!...
-set /p NEW_OAI="  OpenAI API Key   (sk-...)     [INVIO per mantenere]: "
+if not "!CUR_OAI!"=="" echo  OpenAI attuale: !CUR_OAI:~0,20!...
+set /p NEW_OAI="  OpenAI API Key [INVIO per mantenere]: "
 if "!NEW_OAI!"=="" (set FINAL_OAI=!CUR_OAI!) else (set FINAL_OAI=!NEW_OAI!)
 
-REM ·· Soglie di routing ·······················································
 echo.
-echo  Soglie di routing (INVIO per default):
-echo   value_score ^< LLAMA_THRESHOLD  → LLaMA locale
-echo   value_score ^< OPENAI_THRESHOLD → OpenAI GPT
-echo   value_score ^>= OPENAI_THRESHOLD → Claude
-echo.
-set /p THY_LLAMA_THRESHOLD_IN="  LLAMA_THRESHOLD  [default 0.30]: "
-set /p THY_OPENAI_THRESHOLD_IN="  OPENAI_THRESHOLD [default 0.60]: "
-set /p THY_CONFIDENCE_IN="  CONFIDENCE_THRESHOLD [default 0.55]: "
-if not "!THY_LLAMA_THRESHOLD_IN!"==""  set THY_LLAMA_THRESHOLD=!THY_LLAMA_THRESHOLD_IN!
-if not "!THY_OPENAI_THRESHOLD_IN!"=="" set THY_OPENAI_THRESHOLD=!THY_OPENAI_THRESHOLD_IN!
-if not "!THY_CONFIDENCE_IN!"==""       set THY_CONFIDENCE=!THY_CONFIDENCE_IN!
+echo  Soglie routing (INVIO per default  0.30 / 0.60 / 0.55):
+set /p THY_L="  LLAMA_THRESHOLD  [0.30]: "
+set /p THY_O="  OPENAI_THRESHOLD [0.60]: "
+set /p THY_C="  CONFIDENCE       [0.55]: "
+if not "!THY_L!"=="" set THY_LLAMA_THRESHOLD=!THY_L!
+if not "!THY_O!"=="" set THY_OPENAI_THRESHOLD=!THY_O!
+if not "!THY_C!"=="" set THY_CONFIDENCE=!THY_C!
 
 mkdir "%THY_DIR%\logs" >nul 2>&1
 echo  OK - Tri-Hybrid Engine configurato
@@ -697,31 +608,25 @@ REM ── Step 7: Scrivi .env ────────────────�
 echo [7/7] Salvataggio configurazione...
 if exist "%ENV_FILE%" del "%ENV_FILE%"
 
-REM ── PROVIDER ─────────────────────────────────────────────────────────────────
 if /i "!PROVIDER!"=="trihybrid" (
-    if not "!FINAL_A!"=="" (
-        >>"%ENV_FILE%" echo PROVIDER=anthropic
-    ) else (
-        >>"%ENV_FILE%" echo PROVIDER=ollama
-    )
+    if not "!FINAL_A!"=="" ( >>"%ENV_FILE%" echo PROVIDER=anthropic ) else ( >>"%ENV_FILE%" echo PROVIDER=ollama )
     >>"%ENV_FILE%" echo THY_PROVIDER=trihybrid
     >>"%ENV_FILE%" echo ANTHROPIC_BASE_URL=http://127.0.0.1:3002
 ) else if /i "!PROVIDER!"=="bitnet" (
     >>"%ENV_FILE%" echo PROVIDER=bitnet
-    >>"%ENV_FILE%" echo BITNET_DIR=!BITNET_DIR!
-    >>"%ENV_FILE%" echo BITNET_MODEL=!BITNET_MODEL!
-    >>"%ENV_FILE%" echo BITNET_PORT=!BITNET_PORT!
-    >>"%ENV_FILE%" echo BITNET_BASE_URL=http://127.0.0.1:!BITNET_PORT!
+    >>"%ENV_FILE%" echo BITNET_DIR=%BITNET_DIR%
+    >>"%ENV_FILE%" echo BITNET_MODEL=%BITNET_MODEL%
+    >>"%ENV_FILE%" echo BITNET_PORT=%BITNET_PORT%
+    >>"%ENV_FILE%" echo BITNET_BASE_URL=http://127.0.0.1:%BITNET_PORT%
     >>"%ENV_FILE%" echo BITNET_TOOLS_SUPPORTED=0
 ) else (
     >>"%ENV_FILE%" echo PROVIDER=!PROVIDER!
 )
 
-REM ── Variabili comuni ─────────────────────────────────────────────────────────
-if not "!OLLAMA_MODEL!"==""         >>"%ENV_FILE%" echo OLLAMA_MODEL=!OLLAMA_MODEL!
-if not "!OLLAMA_MODEL!"==""         >>"%ENV_FILE%" echo OLLAMA_BASE_URL=http://localhost:11434
-if not "!FINAL_A!"==""              >>"%ENV_FILE%" echo ANTHROPIC_API_KEY=!FINAL_A!
-if not "!CLAUDE_MODEL!"==""         >>"%ENV_FILE%" echo CLAUDE_MODEL=!CLAUDE_MODEL!
+if not "!OLLAMA_MODEL!"==""  >>"%ENV_FILE%" echo OLLAMA_MODEL=!OLLAMA_MODEL!
+if not "!OLLAMA_MODEL!"==""  >>"%ENV_FILE%" echo OLLAMA_BASE_URL=http://localhost:11434
+if not "!FINAL_A!"==""       >>"%ENV_FILE%" echo ANTHROPIC_API_KEY=!FINAL_A!
+if not "!CLAUDE_MODEL!"==""  >>"%ENV_FILE%" echo CLAUDE_MODEL=!CLAUDE_MODEL!
 >>"%ENV_FILE%" echo HL_WALLET_ADDRESS=!FINAL_W!
 >>"%ENV_FILE%" echo HL_PRIVATE_KEY=!FINAL_K!
 >>"%ENV_FILE%" echo HL_NETWORK=!FINAL_NET!
@@ -733,11 +638,10 @@ if "!INSTALL_AUTOTRADE_OK!"=="1" (
     >>"%ENV_FILE%" echo SIGNALS_DIR=!APP_DIR!\playbooks\signals
 )
 
-REM ── Variabili Tri-Hybrid ─────────────────────────────────────────────────────
 if "!PROVIDER!"=="trihybrid" (
-    if not "!FINAL_OAI!"==""        >>"%ENV_FILE%" echo OPENAI_API_KEY=!FINAL_OAI!
+    if not "!FINAL_OAI!"==""     >>"%ENV_FILE%" echo OPENAI_API_KEY=!FINAL_OAI!
     >>"%ENV_FILE%" echo OPENAI_MODEL=!THY_OPENAI_MODEL!
-    if not "!OLLAMA_MODEL!"==""     >>"%ENV_FILE%" echo LLAMA_MODEL=!OLLAMA_MODEL!
+    if not "!OLLAMA_MODEL!"==""  >>"%ENV_FILE%" echo LLAMA_MODEL=!OLLAMA_MODEL!
     >>"%ENV_FILE%" echo CLAUDE_MODEL=!THY_CLAUDE_MODEL!
     >>"%ENV_FILE%" echo LLAMA_THRESHOLD=!THY_LLAMA_THRESHOLD!
     >>"%ENV_FILE%" echo OPENAI_THRESHOLD=!THY_OPENAI_THRESHOLD!
@@ -748,7 +652,6 @@ if "!PROVIDER!"=="trihybrid" (
     >>"%ENV_FILE%" echo CONCURRENT_REQUESTS=10
     >>"%ENV_FILE%" echo THY_ENGINE_DIR=!THY_DIR!
     >>"%ENV_FILE%" echo LOG_DIR=!THY_DIR!\logs
-    echo  OK - Variabili Tri-Hybrid scritte nel .env
 )
 
 echo  OK - .env salvato
@@ -759,26 +662,16 @@ echo  ==========================================
 echo   INSTALLAZIONE COMPLETATA
 if "!PROVIDER!"=="trihybrid" (
     echo   Motore AI : TRI-HYBRID ENGINE
-    if not "!OLLAMA_MODEL!"=="" echo   Tier 1    : LLaMA - !OLLAMA_MODEL! (locale)
-    if "!FINAL_OAI!"=="" (
-        echo   Tier 2    : OpenAI GPT  (KEY NON INSERITA - saltato)
-    ) else (
-        echo   Tier 2    : OpenAI GPT  !THY_OPENAI_MODEL!
-    )
-    if "!FINAL_A!"=="" (
-        echo   Tier 3    : Claude      (KEY NON INSERITA - saltato)
-    ) else (
-        echo   Tier 3    : Claude      !THY_CLAUDE_MODEL!
-    )
+    if not "!OLLAMA_MODEL!"=="" echo   Tier 1    : LLaMA - !OLLAMA_MODEL!
+    if "!FINAL_OAI!"=="" ( echo   Tier 2    : OpenAI GPT (KEY NON INSERITA) ) else ( echo   Tier 2    : OpenAI !THY_OPENAI_MODEL! )
+    if "!FINAL_A!"==""  ( echo   Tier 3    : Claude     (KEY NON INSERITA) ) else ( echo   Tier 3    : Claude !THY_CLAUDE_MODEL! )
     echo   Soglie    : LLaMA^<!THY_LLAMA_THRESHOLD! / OpenAI^<!THY_OPENAI_THRESHOLD! / Claude else
-    echo   Engine    : !THY_DIR!
 ) else if "!PROVIDER!"=="ollama" (
     echo   Motore AI : LOCALE (Ollama) - !OLLAMA_MODEL!
 ) else if "!PROVIDER!"=="bitnet" (
-    echo   Motore AI : BITNET CPU-ONLY
-    echo   Modello   : !BITNET_MODEL! ^(1-bit, nessuna GPU^)
-    echo   Porta     : !BITNET_PORT!
+    echo   Motore AI : BITNET CPU-ONLY - !BITNET_MODEL!
     echo   Tools     : CHAT/ANALISI ONLY
+    echo   Porta     : !BITNET_PORT!
 ) else (
     echo   Motore AI : API - !CLAUDE_MODEL!
 )
@@ -790,9 +683,8 @@ echo.
 set /p LAUNCH="  Avviare HyperVibe ora? (S/N): "
 if /i "!LAUNCH!" neq "S" goto END_NOLAN
 
-REM ── Sequenza di avvio ────────────────────────────────────────────────────────
-if /i "!PROVIDER!"=="trihybrid" goto LAUNCH_TRIHYBRID
 if /i "!PROVIDER!"=="bitnet"    goto LAUNCH_BITNET
+if /i "!PROVIDER!"=="trihybrid" goto LAUNCH_TRIHYBRID
 if /i "!PROVIDER!"=="ollama" (
     start /B ollama serve >nul 2>&1
     ping -n 3 127.0.0.1 >nul 2>&1
@@ -802,29 +694,23 @@ call npm start
 goto END_NOLAN
 
 :LAUNCH_BITNET
-echo.
-echo  Avvio BitNet inference server (porta !BITNET_PORT!)...
-start "HyperVibe - BitNet Server" /min cmd /k ^
-    "cd /d "!BITNET_DIR!" && python run_inference.py -m models/BitNet-b1.58-2B-4T/ggml-model-i2_s.gguf -p "You are a helpful trading assistant" --host 127.0.0.1 --port !BITNET_PORT!"
-echo  Attendo avvio server...
+echo  Avvio BitNet server su porta %BITNET_PORT%...
+set BITNET_LAUNCH_BAT=%TEMP%\bitnet_launch.bat
+echo @echo off > "%BITNET_LAUNCH_BAT%"
+echo call "!VSDEVCMD!" -startdir=none -arch=x64 -host_arch=x64 >> "%BITNET_LAUNCH_BAT%"
+echo cd /d "%BITNET_DIR%" >> "%BITNET_LAUNCH_BAT%"
+echo python run_inference.py -m models/BitNet-b1.58-2B-4T/ggml-model-i2_s.gguf -p "You are a helpful trading assistant" --host 127.0.0.1 --port %BITNET_PORT% >> "%BITNET_LAUNCH_BAT%"
+start "HyperVibe - BitNet Server" /min "%BITNET_LAUNCH_BAT%"
 ping -n 6 127.0.0.1 >nul 2>&1
-echo  Avvio HyperVibe Node.js...
 cd /d "%APP_DIR%"
 call npm start
 goto END_NOLAN
 
 :LAUNCH_TRIHYBRID
-echo.
-echo  Avvio Tri-Hybrid Engine in background...
-if not "!OLLAMA_MODEL!"=="" (
-    echo  [*] Avvio Ollama...
-    start /B ollama serve >nul 2>&1
-    ping -n 4 127.0.0.1 >nul 2>&1
-)
-echo  [*] Avvio Tri-Hybrid Bridge (porta 3002)...
-start "HyperVibe - Tri-Hybrid Bridge" /min cmd /k "cd /d "!THY_DIR!" && python bridge.py"
+echo  Avvio Tri-Hybrid Engine...
+if not "!OLLAMA_MODEL!"=="" ( start /B ollama serve >nul 2>&1 & ping -n 4 127.0.0.1 >nul 2>&1 )
+start "HyperVibe - Tri-Hybrid Bridge" /min cmd /k "cd /d "%THY_DIR%" && python bridge.py"
 ping -n 3 127.0.0.1 >nul 2>&1
-echo  [*] Avvio HyperVibe Node.js...
 cd /d "%APP_DIR%"
 call npm start
 
