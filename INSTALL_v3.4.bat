@@ -353,7 +353,7 @@ REM Aggiorna pip senza richiedere permessi admin
 python -m pip install --upgrade pip --user --quiet 2>nul
 
 REM Installa dipendenze engine con --user (nessun admin richiesto)
-python -m pip install "anthropic>=0.40.0" "openai>=1.50.0" "aiohttp>=3.9.0" --user --quiet
+python -m pip install "anthropic>=0.40.0" "openai>=1.50.0" "aiohttp>=3.9.0" "fastapi>=0.115.0" "uvicorn>=0.30.0" --user --quiet
 if %errorlevel% neq 0 (
     echo  ERRORE: pip install fallito. Controlla la connessione internet.
     pause
@@ -547,6 +547,7 @@ if /i "!PROVIDER!"=="trihybrid" (
         >>"%ENV_FILE%" echo PROVIDER=ollama
     )
     >>"%ENV_FILE%" echo THY_PROVIDER=trihybrid
+    >>"%ENV_FILE%" echo ANTHROPIC_BASE_URL=http://127.0.0.1:3002
 ) else (
     >>"%ENV_FILE%" echo PROVIDER=!PROVIDER!
 )
@@ -633,8 +634,9 @@ if not "!OLLAMA_MODEL!"=="" (
     start /B ollama serve >nul 2>&1
     ping -n 4 127.0.0.1 >nul 2>&1
 )
-echo  [*] Avvio engine Python in finestra separata...
-start "HyperVibe - Tri-Hybrid Engine" /min cmd /k "cd /d "!THY_DIR!" && python main.py"
+echo  [*] Avvio Tri-Hybrid Bridge (porta 3002)...
+start "HyperVibe - Tri-Hybrid Bridge" /min cmd /k "cd /d "!THY_DIR!" && python bridge.py"
+echo  [*] Avvio engine Python (REPL opzionale)...
 ping -n 3 127.0.0.1 >nul 2>&1
 echo  [*] Avvio HyperVibe Node.js...
 cd /d "%APP_DIR%"
