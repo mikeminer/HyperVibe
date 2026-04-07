@@ -23,6 +23,7 @@ import argparse
 import logging
 from typing import Optional, Any
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -45,10 +46,30 @@ logging.basicConfig(
 )
 log = logging.getLogger("bridge")
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    log.info("=" * 56)
+    log.info("  Tri-Hybrid Engine Bridge — starting")
+    log.info(f"  LLaMA  threshold : {settings.LLAMA_THRESHOLD}")
+    log.info(f"  OpenAI threshold : {settings.OPENAI_THRESHOLD}")
+    log.info(f"  Confidence min   : {settings.CONFIDENCE_THRESHOLD}")
+    log.info(f"  LLaMA  model     : {settings.LLAMA_MODEL}")
+    log.info(f"  OpenAI model     : {settings.OPENAI_MODEL}")
+    log.info(f"  Claude model     : {settings.CLAUDE_MODEL}")
+    log.info("=" * 56)
+    asyncio.create_task(get_router().refresh_health())
+    yield
+    # Shutdown
+    if _router:
+        await _router.close()
+    log.info("Bridge shutdown complete.")
+
 app = FastAPI(
     title="Tri-Hybrid Engine Bridge",
     description="Anthropic-compatible proxy routing across LLaMA / GPT / Claude",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -185,6 +206,9 @@ async def score_only(request: Request):
     }
 
 
+# Rate limiter — max concurrent requests to avoid flooding Claude
+_bridge_sem = asyncio.Semaphore(3)
+
 @app.post("/v1/messages")
 async def messages(request: Request):
     """
@@ -192,6 +216,14 @@ async def messages(request: Request):
     Accepts the same request format as POST https://api.anthropic.com/v1/messages
     and returns a compatible response object.
     """
+    t0 = time.monotonic()
+    request_id = uuid.uuid4().hex[:8]
+
+    async with _bridge_sem:
+        return await _handle_messages(request)
+
+
+async def _handle_messages(request: Request):
     t0 = time.monotonic()
     request_id = uuid.uuid4().hex[:8]
 
@@ -267,26 +299,7 @@ async def messages(request: Request):
 
 # ─── Startup / Shutdown ───────────────────────────────────────────────────────
 
-@app.on_event("startup")
-async def startup():
-    log.info("=" * 56)
-    log.info("  Tri-Hybrid Engine Bridge — starting")
-    log.info(f"  LLaMA  threshold : {settings.LLAMA_THRESHOLD}")
-    log.info(f"  OpenAI threshold : {settings.OPENAI_THRESHOLD}")
-    log.info(f"  Confidence min   : {settings.CONFIDENCE_THRESHOLD}")
-    log.info(f"  LLaMA  model     : {settings.LLAMA_MODEL}")
-    log.info(f"  OpenAI model     : {settings.OPENAI_MODEL}")
-    log.info(f"  Claude model     : {settings.CLAUDE_MODEL}")
-    log.info("=" * 56)
-    # Pre-warm health check
-    asyncio.create_task(get_router().refresh_health())
 
-
-@app.on_event("shutdown")
-async def shutdown():
-    if _router:
-        await _router.close()
-    log.info("Bridge shutdown complete.")
 
 
 # ─── Entry point ──────────────────────────────────────────────────────────────
