@@ -1,6 +1,6 @@
 @echo off
 setlocal EnableDelayedExpansion
-title HyperVibe Installer v3.5
+title HyperVibe Installer v3.4
 chcp 437 >nul
 
 set INSTALL_DIR=%~dp0
@@ -9,7 +9,7 @@ set TMP_DIR=%TEMP%\hypervibe_install
 
 echo.
 echo  ==========================================
-echo   HYPERVIBE - Installer v3.5
+echo   HYPERVIBE - Installer v3.4
 echo   Cartella: %INSTALL_DIR%
 echo  ==========================================
 echo.
@@ -167,7 +167,7 @@ if %errorlevel% neq 0 (
 )
 echo  OK - @nktkas/hyperliquid ed ethers installati
 
-echo  Installazione Claude Code CLI...
+echo  Verifica Claude Code CLI...
 call claude --version >nul 2>&1
 if %errorlevel% equ 0 goto CLAUDE_OK
 
@@ -189,8 +189,8 @@ if %errorlevel% neq 0 (
 
 call claude --version >nul 2>&1
 if %errorlevel% neq 0 (
-    echo  ERRORE: Claude Code CLI risulta non disponibile dopo l'installazione.
-    echo  Prova a chiudere e riaprire il terminale, poi riesegui lo script.
+    echo  ERRORE: Claude Code CLI non disponibile dopo l'installazione.
+    echo  Chiudi e riapri il terminale, poi riesegui lo script.
     pause
     exit /b 1
 )
@@ -246,57 +246,69 @@ if "!NEW_A!"=="" (set FINAL_A=!CUR_ANTHROPIC!) else (set FINAL_A=!NEW_A!)
 goto STEP6
 
 REM ── Solo Locale: sottomenu modello ───────────────────────────────────────────
+REM  Tutti i modelli elencati supportano tools/function calling su Ollama.
+REM  Esclusi: deepseek-r1:*, qwq:* (HTTP 400 tools not supported).
 :AI_LOCAL_MENU
 echo.
-echo   Seleziona il modello locale:
+echo   Tutti i modelli elencati supportano tools/function calling.
 echo.
-echo   ── LEGGERI (4-8 GB RAM) ─────────────────────────────
-echo   [1]  Qwen 2.5 7B        - qwen2.5:7b        ~5GB
-echo   [2]  Llama 3.2 3B       - llama3.2:3b        ~2GB
-echo   [3]  Llama 3.1 8B       - llama3.1:8b        ~5GB
-echo   [4]  Mistral 7B         - mistral:7b         ~4GB
-echo   [5]  Gemma 3 4B         - gemma3:4b          ~3GB
-echo   [6]  Phi-4 Mini         - phi4-mini          ~3GB
+echo   ── LEGGERI (2-6 GB RAM) ─────────────────────────────────────────────
+echo   [1]  Llama 3.2 3B          - llama3.2:3b           ~2GB
+echo   [2]  Gemma 3 4B            - gemma3:4b              ~3GB
+echo   [3]  Phi-4 Mini            - phi4-mini              ~3GB
+echo   [4]  Qwen3 4B              - qwen3:4b               ~3GB
+echo   [5]  Mistral 7B            - mistral:7b             ~4GB
+echo   [6]  Llama 3.1 8B          - llama3.1:8b            ~5GB
+echo   [7]  Qwen 2.5 7B           - qwen2.5:7b             ~5GB
+echo   [8]  Qwen3 8B              - qwen3:8b               ~5GB
+echo   [9]  Gemma 3 9B            - gemma3:9b              ~6GB
 echo.
-echo   ── MEDI (8-16 GB RAM) ───────────────────────────────
-echo   [7]  Qwen 2.5 14B       - qwen2.5:14b        ~9GB  (consigliato)
-echo   [8]  Mistral Nemo 12B   - mistral-nemo        ~8GB
-echo   [9]  Phi-4 14B          - phi4               ~9GB
-echo   [10] Llama 3.3 70B Q4   - llama3.3:70b-q4   ~12GB
-echo   [11] DeepSeek-R1 14B    - deepseek-r1:14b   ~10GB
-echo   [12] Qwen 2.5 Coder 14B - qwen2.5-coder:14b ~9GB
+echo   ── MEDI (8-16 GB RAM) ───────────────────────────────────────────────
+echo   [10] Qwen 2.5 14B          - qwen2.5:14b            ~9GB  (consigliato)
+echo   [11] Qwen3 14B             - qwen3:14b              ~9GB
+echo   [12] Phi-4 14B             - phi4:14b               ~9GB
+echo   [13] Qwen 2.5 Coder 14B   - qwen2.5-coder:14b      ~9GB
+echo   [14] Mistral Nemo 12B      - mistral-nemo            ~8GB
+echo   [15] Granite 3.2 8B        - granite3.2:8b           ~5GB
+echo   [16] Llama 3.3 70B Q4     - llama3.3:70b-q4_K_M   ~12GB
 echo.
-echo   ── PESANTI (20+ GB RAM) ─────────────────────────────
-echo   [13] Gemma 4 26B MoE    - gemma4:26b        ~20GB
-echo   [14] Qwen 2.5 32B       - qwen2.5:32b       ~22GB
-echo   [15] DeepSeek-R1 32B    - deepseek-r1:32b   ~22GB
-echo   [16] Llama 3.1 70B      - llama3.1:70b      ~48GB
-echo   [17] Mixtral 8x7B       - mixtral:8x7b      ~30GB
+echo   ── PESANTI (20+ GB RAM) ─────────────────────────────────────────────
+echo   [17] Gemma 4 27B MoE       - gemma4:27b            ~20GB
+echo   [18] Qwen3 32B             - qwen3:32b             ~22GB
+echo   [19] Qwen 2.5 32B          - qwen2.5:32b           ~22GB
+echo   [20] Mixtral 8x7B          - mixtral:8x7b          ~30GB
+echo   [21] Llama 3.1 70B         - llama3.1:70b          ~48GB
+echo   [22] Qwen3 72B             - qwen3:72b             ~48GB
 echo.
-echo   [18] Nome custom (inserisci tag Ollama manualmente)
+echo   [23] Nome custom (inserisci tag Ollama manualmente)
 echo.
 set LOCAL_CHOICE=
 :ASK_LOCAL
-set /p LOCAL_CHOICE="  Modello [1-18]: "
-if "!LOCAL_CHOICE!"=="1"  ( set OLLAMA_MODEL=qwen2.5:7b         & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
-if "!LOCAL_CHOICE!"=="2"  ( set OLLAMA_MODEL=llama3.2:3b        & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
-if "!LOCAL_CHOICE!"=="3"  ( set OLLAMA_MODEL=llama3.1:8b        & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
-if "!LOCAL_CHOICE!"=="4"  ( set OLLAMA_MODEL=mistral:7b         & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
-if "!LOCAL_CHOICE!"=="5"  ( set OLLAMA_MODEL=gemma3:4b          & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
-if "!LOCAL_CHOICE!"=="6"  ( set OLLAMA_MODEL=phi4-mini          & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
-if "!LOCAL_CHOICE!"=="7"  ( set OLLAMA_MODEL=qwen2.5:14b        & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
-if "!LOCAL_CHOICE!"=="8"  ( set OLLAMA_MODEL=mistral-nemo       & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
-if "!LOCAL_CHOICE!"=="9"  ( set OLLAMA_MODEL=phi4               & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
-if "!LOCAL_CHOICE!"=="10" ( set OLLAMA_MODEL=llama3.3:70b-q4   & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
-if "!LOCAL_CHOICE!"=="11" ( set OLLAMA_MODEL=deepseek-r1:14b   & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
-if "!LOCAL_CHOICE!"=="12" ( set OLLAMA_MODEL=qwen2.5-coder:14b & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
-if "!LOCAL_CHOICE!"=="13" ( set OLLAMA_MODEL=gemma4:26b         & set FORCE_UPDATE_OLLAMA=1 & goto LOCAL_OK )
-if "!LOCAL_CHOICE!"=="14" ( set OLLAMA_MODEL=qwen2.5:32b        & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
-if "!LOCAL_CHOICE!"=="15" ( set OLLAMA_MODEL=deepseek-r1:32b   & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
-if "!LOCAL_CHOICE!"=="16" ( set OLLAMA_MODEL=llama3.1:70b       & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
-if "!LOCAL_CHOICE!"=="17" ( set OLLAMA_MODEL=mixtral:8x7b       & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
-if "!LOCAL_CHOICE!"=="18" (
-    set /p OLLAMA_MODEL="  Tag Ollama (es. qwen2.5:72b): "
+set /p LOCAL_CHOICE="  Modello [1-23]: "
+if "!LOCAL_CHOICE!"=="1"  ( set OLLAMA_MODEL=llama3.2:3b          & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="2"  ( set OLLAMA_MODEL=gemma3:4b             & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="3"  ( set OLLAMA_MODEL=phi4-mini             & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="4"  ( set OLLAMA_MODEL=qwen3:4b              & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="5"  ( set OLLAMA_MODEL=mistral:7b            & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="6"  ( set OLLAMA_MODEL=llama3.1:8b           & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="7"  ( set OLLAMA_MODEL=qwen2.5:7b            & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="8"  ( set OLLAMA_MODEL=qwen3:8b              & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="9"  ( set OLLAMA_MODEL=gemma3:9b             & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="10" ( set OLLAMA_MODEL=qwen2.5:14b           & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="11" ( set OLLAMA_MODEL=qwen3:14b             & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="12" ( set OLLAMA_MODEL=phi4:14b              & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="13" ( set OLLAMA_MODEL=qwen2.5-coder:14b     & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="14" ( set OLLAMA_MODEL=mistral-nemo          & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="15" ( set OLLAMA_MODEL=granite3.2:8b         & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="16" ( set OLLAMA_MODEL=llama3.3:70b-q4_K_M  & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="17" ( set OLLAMA_MODEL=gemma4:27b            & set FORCE_UPDATE_OLLAMA=1 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="18" ( set OLLAMA_MODEL=qwen3:32b             & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="19" ( set OLLAMA_MODEL=qwen2.5:32b           & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="20" ( set OLLAMA_MODEL=mixtral:8x7b          & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="21" ( set OLLAMA_MODEL=llama3.1:70b          & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="22" ( set OLLAMA_MODEL=qwen3:72b             & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="23" (
+    set /p OLLAMA_MODEL="  Tag Ollama (es. qwen3:30b-a3b): "
     set FORCE_UPDATE_OLLAMA=0
     goto LOCAL_OK
 )
@@ -311,12 +323,6 @@ goto OLLAMA_SETUP
 
 REM ────────────────────────────────────────────────────────────────────────────
 REM [3] TRI-HYBRID ENGINE
-REM  - Installa Python 3.11+ se necessario
-REM  - Copia tri_hybrid_engine/ nella cartella app se non presente
-REM  - Installa le dipendenze Python (anthropic, openai, aiohttp)
-REM  - Chiede Anthropic API Key + OpenAI API Key
-REM  - Chiede il modello LLaMA locale (Ollama)
-REM  - Scrive le soglie di routing nel .env principale
 REM ────────────────────────────────────────────────────────────────────────────
 :AI_TRIHYBRID
 set PROVIDER=trihybrid
@@ -324,7 +330,7 @@ set OLLAMA_MODEL=
 set CLAUDE_MODEL=
 set FINAL_A=
 set FINAL_OAI=
-set THY_LLAMA_MODEL=llama3.2
+set THY_LLAMA_MODEL=llama3.1:8b
 set THY_OPENAI_MODEL=gpt-4o-mini
 set THY_CLAUDE_MODEL=claude-haiku-4-5-20251001
 set THY_LLAMA_THRESHOLD=0.30
@@ -390,8 +396,6 @@ if not exist "%THY_DIR%\main.py" (
 
 REM ·· Dipendenze Python ·······································
 echo  [*] Installazione dipendenze Python...
-
-REM Ripristina pip se corrotto
 python -m ensurepip --upgrade --user >nul 2>&1
 python -m pip --version >nul 2>&1
 if %errorlevel% neq 0 (
@@ -399,11 +403,7 @@ if %errorlevel% neq 0 (
     curl -L --progress-bar -o "%TMP_DIR%\get-pip.py" "https://bootstrap.pypa.io/get-pip.py"
     python "%TMP_DIR%\get-pip.py" --user --quiet
 )
-
-REM Aggiorna pip senza richiedere permessi admin
 python -m pip install --upgrade pip --user --quiet 2>nul
-
-REM Installa dipendenze engine
 python -m pip install "anthropic>=0.40.0" "openai>=1.50.0" "aiohttp>=3.9.0" "fastapi>=0.115.0" "uvicorn>=0.30.0" --user --quiet
 if %errorlevel% neq 0 (
     echo  ERRORE: pip install fallito. Controlla la connessione internet.
@@ -430,20 +430,22 @@ if /i "!INSTALL_OLLAMA_THY!"=="S" (
         set "PATH=%LOCALAPPDATA%\Programs\Ollama;%PATH%"
     )
     echo.
-    echo  Modelli LLaMA disponibili:
-    echo   [1] llama3.2   (2GB - consigliato)
-    echo   [2] llama3.1   (4GB - piu' capace)
-    echo   [3] mistral    (4GB - alternativa)
-    echo   [4] phi4       (9GB - Microsoft, ottimo)
-    echo   [5] Nome custom
+    echo  Modelli disponibili per tier LLaMA (tutti con tools support):
+    echo   [1] llama3.2:3b    (2GB  - leggero)
+    echo   [2] llama3.1:8b    (5GB  - bilanciato, consigliato)
+    echo   [3] qwen3:8b       (5GB  - alternativa capace)
+    echo   [4] mistral:7b     (4GB  - veloce)
+    echo   [5] qwen2.5:14b    (9GB  - qualita' alta)
+    echo   [6] Nome custom
     echo.
     set LLAMA_PICK=
-    set /p LLAMA_PICK="  Scelta [1-5]: "
-    if "!LLAMA_PICK!"=="1" set THY_LLAMA_MODEL=llama3.2
-    if "!LLAMA_PICK!"=="2" set THY_LLAMA_MODEL=llama3.1
-    if "!LLAMA_PICK!"=="3" set THY_LLAMA_MODEL=mistral
-    if "!LLAMA_PICK!"=="4" set THY_LLAMA_MODEL=phi4
-    if "!LLAMA_PICK!"=="5" set /p THY_LLAMA_MODEL="  Nome modello: "
+    set /p LLAMA_PICK="  Scelta [1-6]: "
+    if "!LLAMA_PICK!"=="1" set THY_LLAMA_MODEL=llama3.2:3b
+    if "!LLAMA_PICK!"=="2" set THY_LLAMA_MODEL=llama3.1:8b
+    if "!LLAMA_PICK!"=="3" set THY_LLAMA_MODEL=qwen3:8b
+    if "!LLAMA_PICK!"=="4" set THY_LLAMA_MODEL=mistral:7b
+    if "!LLAMA_PICK!"=="5" set THY_LLAMA_MODEL=qwen2.5:14b
+    if "!LLAMA_PICK!"=="6" set /p THY_LLAMA_MODEL="  Nome modello: "
     echo  Download !THY_LLAMA_MODEL! (potrebbe richiedere diversi minuti)...
     start /B ollama serve >nul 2>&1
     ping -n 5 127.0.0.1 >nul 2>&1
@@ -462,7 +464,6 @@ echo  Inserisci le API Key per i tier cloud del Tri-Hybrid Engine.
 echo  Puoi lasciare vuoti i campi per i provider che non vuoi usare.
 echo  (es: senza OpenAI Key, il tier medio viene saltato e si scala a Claude)
 echo.
-
 set CUR_A=
 set CUR_OAI=
 if exist "%ENV_FILE%" (
@@ -471,7 +472,6 @@ if exist "%ENV_FILE%" (
         if "%%a"=="OPENAI_API_KEY"    set CUR_OAI=%%b
     )
 )
-
 if not "!CUR_A!"==""   echo  Anthropic attuale : !CUR_A:~0,20!...
 set /p NEW_A="  Anthropic API Key (sk-ant-...) [INVIO per mantenere]: "
 if "!NEW_A!"=="" (set FINAL_A=!CUR_A!) else (set FINAL_A=!NEW_A!)
@@ -480,12 +480,12 @@ if not "!CUR_OAI!"=="" echo  OpenAI attuale    : !CUR_OAI:~0,20!...
 set /p NEW_OAI="  OpenAI API Key   (sk-...)     [INVIO per mantenere]: "
 if "!NEW_OAI!"=="" (set FINAL_OAI=!CUR_OAI!) else (set FINAL_OAI=!NEW_OAI!)
 
-REM ·· Soglie di routing (avanzate) ····························
+REM ·· Soglie di routing ·······································
 echo.
 echo  Soglie di routing (INVIO per usare i default):
 echo   value_score ^< LLAMA_THRESHOLD  → LLaMA locale
 echo   value_score ^< OPENAI_THRESHOLD → OpenAI GPT
-echo   value_score ^≥ OPENAI_THRESHOLD → Claude
+echo   value_score ^>= OPENAI_THRESHOLD → Claude
 echo.
 set /p THY_LLAMA_THRESHOLD_IN="  LLAMA_THRESHOLD  [default 0.30]: "
 set /p THY_OPENAI_THRESHOLD_IN="  OPENAI_THRESHOLD [default 0.60]: "
@@ -494,13 +494,11 @@ if not "!THY_LLAMA_THRESHOLD_IN!"==""  set THY_LLAMA_THRESHOLD=!THY_LLAMA_THRESH
 if not "!THY_OPENAI_THRESHOLD_IN!"=="" set THY_OPENAI_THRESHOLD=!THY_OPENAI_THRESHOLD_IN!
 if not "!THY_CONFIDENCE_IN!"==""       set THY_CONFIDENCE=!THY_CONFIDENCE_IN!
 
-REM ·· Directory logs engine ···································
 mkdir "%THY_DIR%\logs" >nul 2>&1
 echo  OK - Tri-Hybrid Engine configurato
-
 goto STEP6
 
-REM ── Ollama setup condiviso (Solo Locale: Qwen / Gemma) ───────────────────────
+REM ── Ollama setup condiviso (Solo Locale) ─────────────────────────────────────
 :OLLAMA_SETUP
 echo.
 echo  Verifica Ollama...
@@ -591,7 +589,6 @@ REM ── Step 7: Scrivi .env ────────────────�
 echo [7/7] Salvataggio configurazione...
 if exist "%ENV_FILE%" del "%ENV_FILE%"
 
-REM Scrivi PROVIDER compatibile con Node.js (accetta solo anthropic/ollama)
 if /i "!PROVIDER!"=="trihybrid" (
     if not "!FINAL_A!"=="" (
         >>"%ENV_FILE%" echo PROVIDER=anthropic
@@ -618,7 +615,6 @@ if "!INSTALL_AUTOTRADE_OK!"=="1" (
     >>"%ENV_FILE%" echo SIGNALS_DIR=!APP_DIR!\playbooks\signals
 )
 
-REM ── Variabili aggiuntive per il Tri-Hybrid Engine ────────────────────────────
 if "!PROVIDER!"=="trihybrid" (
     if not "!FINAL_OAI!"==""        >>"%ENV_FILE%" echo OPENAI_API_KEY=!FINAL_OAI!
     >>"%ENV_FILE%" echo OPENAI_MODEL=!THY_OPENAI_MODEL!
@@ -670,7 +666,6 @@ echo.
 set /p LAUNCH="  Avviare HyperVibe ora? (S/N): "
 if /i "!LAUNCH!" neq "S" goto END_NOLAN
 
-REM ── Sequenza di avvio per ogni provider ──────────────────────────────────────
 if /i "!PROVIDER!"=="trihybrid" goto LAUNCH_TRIHYBRID
 if /i "!PROVIDER!"=="ollama" (
     start /B ollama serve >nul 2>&1
@@ -690,7 +685,6 @@ if not "!OLLAMA_MODEL!"=="" (
 )
 echo  [*] Avvio Tri-Hybrid Bridge (porta 3002)...
 start "HyperVibe - Tri-Hybrid Bridge" /min cmd /k "cd /d "!THY_DIR!" && python bridge.py"
-echo  [*] Avvio engine Python (REPL opzionale)...
 ping -n 3 127.0.0.1 >nul 2>&1
 echo  [*] Avvio HyperVibe Node.js...
 cd /d "%APP_DIR%"
