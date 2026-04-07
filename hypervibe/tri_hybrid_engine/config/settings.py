@@ -52,7 +52,7 @@ class Settings:
     # ── Timeouts (seconds) ────────────────────────────────────────────────────
     LLAMA_TIMEOUT_SECS: float = float(os.getenv("LLAMA_TIMEOUT_SECS", "60.0"))
     OPENAI_TIMEOUT_SECS: float = float(os.getenv("OPENAI_TIMEOUT_SECS", "30.0"))
-    CLAUDE_TIMEOUT_SECS: float = float(os.getenv("CLAUDE_TIMEOUT_SECS", "30.0"))
+    CLAUDE_TIMEOUT_SECS: float = float(os.getenv("CLAUDE_TIMEOUT_SECS", "180.0"))
 
     # ── Throughput ────────────────────────────────────────────────────────────
     CONCURRENT_REQUESTS: int = int(os.getenv("CONCURRENT_REQUESTS", "10"))
