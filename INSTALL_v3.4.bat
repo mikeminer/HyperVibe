@@ -1,6 +1,6 @@
 @echo off
 setlocal EnableDelayedExpansion
-title HyperVibe Installer v3.10
+title HyperVibe Installer v3.11
 chcp 437 >nul
 
 set INSTALL_DIR=%~dp0
@@ -9,7 +9,7 @@ set TMP_DIR=%TEMP%\hypervibe_install
 
 echo.
 echo  ==========================================
-echo   HYPERVIBE - Installer v3.10
+echo   HYPERVIBE - Installer v3.11
 echo   Cartella: %INSTALL_DIR%
 echo  ==========================================
 echo.
@@ -215,7 +215,7 @@ REM ── Solo Locale: sottomenu modello (Ollama) ─────────�
 echo.
 echo   Tutti i modelli elencati supportano tools/function calling.
 echo.
-echo   ── LEGGERI (2-6 GB RAM) ─────────────────────────────────────────────
+echo   -- LEGGERI (2-6 GB RAM) ------------------------------------------
 echo   [1]  Llama 3.2 3B          - llama3.2:3b           ~2GB
 echo   [2]  Gemma 3 4B            - gemma3:4b              ~3GB
 echo   [3]  Phi-4 Mini            - phi4-mini              ~3GB
@@ -226,7 +226,7 @@ echo   [7]  Qwen 2.5 7B           - qwen2.5:7b             ~5GB
 echo   [8]  Qwen3 8B              - qwen3:8b               ~5GB
 echo   [9]  Gemma 3 9B            - gemma3:9b              ~6GB
 echo.
-echo   ── MEDI (8-16 GB RAM) ───────────────────────────────────────────────
+echo   -- MEDI (8-16 GB RAM) --------------------------------------------
 echo   [10] Qwen 2.5 14B          - qwen2.5:14b            ~9GB  (consigliato)
 echo   [11] Qwen3 14B             - qwen3:14b              ~9GB
 echo   [12] Phi-4 14B             - phi4:14b               ~9GB
@@ -235,7 +235,7 @@ echo   [14] Mistral Nemo 12B      - mistral-nemo            ~8GB
 echo   [15] Granite 3.2 8B        - granite3.2:8b           ~5GB
 echo   [16] Llama 3.3 70B Q4     - llama3.3:70b-q4_K_M   ~12GB
 echo.
-echo   ── PESANTI (20+ GB RAM) ─────────────────────────────────────────────
+echo   -- PESANTI (20+ GB RAM) ------------------------------------------
 echo   [17] Gemma 4 27B MoE       - gemma4:27b            ~20GB
 echo   [18] Qwen3 32B             - qwen3:32b             ~22GB
 echo   [19] Qwen 2.5 32B          - qwen2.5:32b           ~22GB
@@ -291,7 +291,7 @@ set BITNET_MODEL=BitNet-b1.58-2B-4T
 set BITNET_DIR=%HV_DIR%\bitnet
 
 echo.
-echo  ── BITNET CPU ENGINE ────────────────────────────────────────────────────
+echo  -- BITNET CPU ENGINE ------------------------------------------------
 echo   Inferenza 1-bit nativa Microsoft, nessuna GPU richiesta.
 echo   Modello: BitNet b1.58 2B4T, circa 1.2GB, solo CPU.
 echo.
@@ -353,7 +353,6 @@ if %errorlevel% neq 0 (
 echo  OK - CMake trovato
 
 REM ·· clang-cl integrato in VS ────────────────────────────────────────────────
-REM    BitNet usa -T ClangCL: serve clang-cl.exe DENTRO VS, non LLVM standalone
 echo  [*] Verifica clang-cl integrato in Visual Studio...
 set "CLANGCL_EXE="
 if exist "%VSWHERE%" (
@@ -372,8 +371,8 @@ if not defined CLANGCL_EXE (
     if not exist "!VS_INSTALLER!" (
         echo  ERRORE: vs_installer.exe non trovato.
         echo  Apri VS Installer manualmente:
-        echo    Modifica ^> Componenti singoli ^> cerca "Clang"
-        echo    ^> spunta "C++ Clang tools for Windows" ^> Modifica
+        echo    Modifica - Componenti singoli - cerca Clang
+        echo    - spunta C++ Clang tools for Windows - Modifica
         pause
         goto STEP5
     )
@@ -391,8 +390,8 @@ if not defined CLANGCL_EXE (
         echo.
         echo  ERRORE: clang-cl.exe non trovato dopo installazione.
         echo  Apri VS Installer manualmente:
-        echo    Modifica ^> Componenti singoli ^> cerca "Clang"
-        echo    ^> spunta "C++ Clang tools for Windows" ^> Modifica
+        echo    Modifica - Componenti singoli - cerca Clang
+        echo    - spunta C++ Clang tools for Windows - Modifica
         echo  Poi riesegui questo installer.
         pause
         goto STEP5
@@ -412,7 +411,7 @@ if defined LLVM_BIN ( set "PATH=!LLVM_BIN!;!PATH!" & echo  OK - LLVM: !LLVM_BIN!
 echo  LLVM standalone non trovato (non bloccante)
 :LLVM_DONE
 
-REM ·· Python 3.11 obbligatorio (torch 2.2.1 non supporta 3.12+) ───────────────
+REM ·· Python 3.11 obbligatorio ────────────────────────────────────────────────
 echo  [*] Verifica Python 3.11 per BitNet...
 echo      torch 2.2.1 richiesto da BitNet non supporta Python 3.12+
 echo.
@@ -462,7 +461,6 @@ echo  [*] Aggiornamento pip Python 3.11...
 if %errorlevel% neq 0 ( echo  ERRORE: aggiornamento pip fallito. & pause & goto STEP5 )
 
 echo  [*] Installazione huggingface-hub...
-REM Versione vincolata per compatibilita' con transformers che richiede <1.0
 !PYEXE! -m pip install "huggingface_hub>=0.34.0,<1.0" --user --quiet --no-warn-script-location
 if %errorlevel% neq 0 ( echo  ERRORE: pip install huggingface_hub fallito. & pause & goto STEP5 )
 echo  OK - huggingface-hub pronto
@@ -486,9 +484,6 @@ if %errorlevel% neq 0 ( echo  ERRORE: submodule update fallito. & pause & goto S
 echo  OK - Submoduli pronti
 
 REM ·· FIX v3.10: pulizia cache build stale ────────────────────────────────────
-REM    La directory build puo' contenere CMakeCache.txt con riferimenti a una
-REM    versione di VS precedente (es. 2019 con MSBuild v160 senza ClangCL).
-REM    Cancellarla forza cmake a rilevare correttamente il toolset attuale.
 if exist "%BITNET_DIR%\build" (
     echo  [*] Pulizia cache build precedente...
     rmdir /s /q "%BITNET_DIR%\build" >nul 2>&1
@@ -518,9 +513,8 @@ if %errorlevel% neq 0 (
     echo  ERRORE: Build BitNet fallita.
     echo  Controlla il log: !BITNET_DIR!\logs\generate_build_files.log
     echo.
-    echo  Causa piu' probabile: clang-cl non attivato correttamente in VS.
-    echo  Verifica che "C++ Clang tools for Windows" sia installato:
-    echo    VS Installer ^> Modifica ^> Componenti singoli ^> cerca Clang
+    echo  Verifica che "C++ Clang tools for Windows" sia installato in VS:
+    echo    VS Installer - Modifica - Componenti singoli - cerca Clang
     echo.
     echo  Prova manualmente dal Developer Command Prompt for VS:
     echo    cd !BITNET_DIR!
@@ -531,7 +525,6 @@ if %errorlevel% neq 0 (
 )
 del "%BITNET_BUILD_BAT%" >nul 2>&1
 
-REM ·· Verifica .gguf prodotto ─────────────────────────────────────────────────
 if not exist "%BITNET_DIR%\models\BitNet-b1.58-2B-4T\ggml-model-i2_s.gguf" (
     echo  ERRORE: .gguf non trovato dopo la build. Build incompleta.
     pause
@@ -593,7 +586,7 @@ set THY_CONFIDENCE=0.55
 set THY_MAX_ESC=2
 
 echo.
-echo  ── TRI-HYBRID ENGINE ────────────────────────────────────────────────────
+echo  -- TRI-HYBRID ENGINE ------------------------------------------------
 echo   Routing automatico: LLaMA locale / OpenAI GPT / Claude
 echo.
 
@@ -795,21 +788,30 @@ echo LOG_DIR=!THY_DIR!\logs>>"%ENV_FILE%"
 echo  OK - .env salvato
 rmdir /s /q "%TMP_DIR%" >nul 2>&1
 
+REM ── Riepilogo ────────────────────────────────────────────────────────────────
 echo.
 echo  ==========================================
 echo   INSTALLAZIONE COMPLETATA
 if /i "!PROVIDER!"=="trihybrid" (
     echo   Motore AI : TRI-HYBRID ENGINE
     if not "!OLLAMA_MODEL!"=="" echo   Tier 1    : LLaMA - !OLLAMA_MODEL!
-    if "!FINAL_OAI!"=="" ( echo   Tier 2    : OpenAI GPT (KEY NON INSERITA) ) else ( echo   Tier 2    : OpenAI !THY_OPENAI_MODEL! )
-    if "!FINAL_A!"==""  ( echo   Tier 3    : Claude     (KEY NON INSERITA) ) else ( echo   Tier 3    : Claude !THY_CLAUDE_MODEL! )
-    echo   Soglie    : LLaMA^<!THY_LLAMA_THRESHOLD! / OpenAI^<!THY_OPENAI_THRESHOLD! / Confidence^<!THY_CONFIDENCE!
+    if "!FINAL_OAI!"=="" (
+        echo   Tier 2    : OpenAI GPT ^(KEY NON INSERITA^)
+    ) else (
+        echo   Tier 2    : OpenAI !THY_OPENAI_MODEL!
+    )
+    if "!FINAL_A!"=="" (
+        echo   Tier 3    : Claude ^(KEY NON INSERITA^)
+    ) else (
+        echo   Tier 3    : Claude !THY_CLAUDE_MODEL!
+    )
+    echo   Soglie    : LLaMA^<!THY_LLAMA_THRESHOLD! / OpenAI^<!THY_OPENAI_THRESHOLD! / Conf^<!THY_CONFIDENCE!
 ) else if /i "!PROVIDER!"=="ollama" (
-    echo   Motore AI : LOCALE (Ollama) - !OLLAMA_MODEL!
+    echo   Motore AI : LOCALE - !OLLAMA_MODEL!
 ) else if /i "!PROVIDER!"=="bitnet" (
     echo   Motore AI : BITNET CPU-ONLY - !BITNET_MODEL!
     echo   Python    : !PY_BITNET_VER!
-    echo   clang-cl  : !CLANGCL_EXE!
+    echo   clang-cl  : OK
     echo   Tools     : CHAT/ANALISI ONLY
     echo   Porta     : !BITNET_PORT!
 ) else (
