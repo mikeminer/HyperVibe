@@ -362,13 +362,58 @@ if %errorlevel% neq 0 (
 echo  OK - CMake trovato
 
 REM ·· Python + huggingface-cli ·················································
-echo  [*] Installazione huggingface-cli...
-python -m pip install "huggingface_hub[cli]" --quiet 2>nul
-if %errorlevel% neq 0 (
-    echo  ERRORE: pip install huggingface_hub fallito. Controlla Python e pip.
+echo  [*] Verifica Python...
+
+set "PYEXE="
+where py >nul 2>&1
+if %errorlevel% equ 0 set "PYEXE=py -3"
+
+if not defined PYEXE (
+    where python >nul 2>&1
+    if %errorlevel% equ 0 set "PYEXE=python"
+)
+
+if not defined PYEXE (
+    echo  ERRORE: Python non trovato.
+    echo  Installa Python 3 e seleziona "Add Python to PATH".
     pause
     goto STEP5
 )
+
+%PYEXE% --version
+if %errorlevel% neq 0 (
+    echo  ERRORE: Python presente ma non eseguibile correttamente.
+    pause
+    goto STEP5
+)
+
+echo  [*] Verifica pip...
+%PYEXE% -m ensurepip --upgrade >nul 2>&1
+%PYEXE% -m pip --version >nul 2>&1
+if %errorlevel% neq 0 (
+    echo  ERRORE: pip non disponibile per questo interprete Python.
+    pause
+    goto STEP5
+)
+
+echo  [*] Aggiornamento pip/setuptools/wheel...
+%PYEXE% -m pip install --upgrade pip setuptools wheel --user
+if %errorlevel% neq 0 (
+    echo  ERRORE: aggiornamento pip fallito.
+    pause
+    goto STEP5
+)
+
+echo  [*] Installazione huggingface-cli...
+%PYEXE% -m pip install --upgrade "huggingface_hub[cli]" --user
+if %errorlevel% neq 0 (
+    echo  ERRORE: pip install huggingface_hub fallito.
+    echo  Prova manualmente:
+    echo     %PYEXE% -m pip install --upgrade "huggingface_hub[cli]" --user
+    pause
+    goto STEP5
+)
+
 echo  OK - huggingface-cli pronto
 
 REM ·· Clone microsoft/BitNet ···················································
