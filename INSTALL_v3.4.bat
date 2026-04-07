@@ -318,65 +318,32 @@ REM ·· Cerca VsDevCmd.bat via PowerShell ··················�
 echo.
 echo  [*] Ricerca Visual Studio 2022...
 set VSDEVCMD=
-for /f "usebackq delims=" %%P in (`powershell -NoProfile -Command "Get-ChildItem 'C:\Program Files\Microsoft Visual Studio\2022' -Recurse -Filter VsDevCmd.bat -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName" 2^>nul`) do set VSDEVCMD=%%P
+echo.
+echo  [*] Ricerca Visual Studio 2022...
+set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
+set "VSDEVCMD="
 
-if "!VSDEVCMD!"=="" (
-    echo  Visual Studio 2022 non trovato. Installazione via winget...
-   winget --version >nul 2>&1
-    if %errorlevel% neq 0 (
-        echo  winget non disponibile. Download diretto VS2022...
-        curl -L --progress-bar -o "%TMP_DIR%\vs_community.exe" "https://aka.ms/vs/17/release/vs_community.exe"
-        if %errorlevel% neq 0 (
-            echo  ERRORE: Download VS2022 fallito. Controlla la connessione.
-            echo  Installa manualmente da:
-            echo  https://visualstudio.microsoft.com/vs/community/
-            pause
-            goto STEP5
-        )
-        echo  Installazione VS2022 Community con workload C++...
-        echo  (richiede 10-20 minuti, la finestra potrebbe non mostrare progressi)
-        "%TMP_DIR%\vs_community.exe" --wait --quiet --add Microsoft.VisualStudio.Workload.NativeDesktop --includeRecommended
-        if %errorlevel% neq 0 if %errorlevel% neq 3010 (
-            echo  ERRORE: Installazione VS2022 fallita (codice !errorlevel!).
-            echo  Installa manualmente da:
-            echo  https://visualstudio.microsoft.com/vs/community/
-            pause
-            goto STEP5
-        )
-        if %errorlevel% equ 3010 (
-            echo  OK - VS2022 installato. RIAVVIO RICHIESTO.
-            echo  Riavvia il PC e riesegui l'installer per continuare.
-            pause
-            goto STEP5
-        )
-        goto VS_SEARCH_RETRY
-    )
-    winget install Microsoft.VisualStudio.2022.Community --silent --override "--wait --quiet --add Microsoft.VisualStudio.Workload.NativeDesktop --includeRecommended"
-    if %errorlevel% neq 0 if %errorlevel% neq 3010 (
-        echo  ERRORE: Installazione VS2022 via winget fallita.
-        echo  Installa manualmente da:
-        echo  https://visualstudio.microsoft.com/vs/community/
-        pause
-        goto STEP5
-    )
-    if %errorlevel% equ 3010 (
-        echo  OK - VS2022 installato. RIAVVIO RICHIESTO.
-        echo  Riavvia il PC e riesegui l'installer per continuare.
-        pause
-        goto STEP5
-    )
-
-:VS_SEARCH_RETRY
-    echo  OK - VS2022 installato. Ricerco VsDevCmd.bat...
-    for /f "usebackq delims=" %%P in (`powershell -NoProfile -Command "Get-ChildItem 'C:\Program Files\Microsoft Visual Studio\2022' -Recurse -Filter VsDevCmd.bat -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName" 2^>nul`) do set VSDEVCMD=%%P
-    if "!VSDEVCMD!"=="" (
-        echo  ERRORE: VsDevCmd.bat non trovato dopo installazione.
-        echo  Riavvia il PC e riesegui l'installer.
-        pause
-        goto STEP5
-    )
+if exist "%VSWHERE%" (
+    for /f "usebackq delims=" %%P in (`"%VSWHERE%" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -find Common7\Tools\VsDevCmd.bat`) do set "VSDEVCMD=%%P"
 )
-echo  OK - Trovato: !VSDEVCMD!
+
+if not defined VSDEVCMD (
+    echo  Visual Studio con workload C++ non trovato.
+    echo  Provo installazione...
+    winget install --id Microsoft.VisualStudio.2022.Community --silent --accept-package-agreements --accept-source-agreements --override "--wait --quiet --add Microsoft.VisualStudio.Workload.NativeDesktop --includeRecommended"
+)
+
+if not defined VSDEVCMD if exist "%VSWHERE%" (
+    for /f "usebackq delims=" %%P in (`"%VSWHERE%" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -find Common7\Tools\VsDevCmd.bat`) do set "VSDEVCMD=%%P"
+)
+
+if not defined VSDEVCMD (
+    echo  ERRORE: VsDevCmd.bat non trovato.
+    pause
+    goto STEP5
+)
+
+echo  OK - Trovato: %VSDEVCMD%
 
 REM ·· CMake ····················································
 echo  [*] Verifica CMake...
