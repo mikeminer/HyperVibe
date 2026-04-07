@@ -86,20 +86,20 @@ echo  OK - Git trovato
 
 REM ── Step 3: Clone / Pull ─────────────────────────────────────────────────────
 echo [3/7] HyperVibe...
+set _SKIP_CLONE=0
 if "!ALREADY_CLONED!"=="1" (
-    echo  Aggiornamento repo esistente...
-    cd /d "%HV_DIR%"
-    git pull
-    echo  OK - Aggiornato
-    goto STEP4
+    echo  Repo gia' presente - salto clone.
+    git -C "%HV_DIR%" pull >nul 2>&1
+    echo  OK - Aggiornato ^(o non-git, proseguo^)
+    set _SKIP_CLONE=1
 )
-if exist "%APP_DIR%\package.json" (
+if "!_SKIP_CLONE!"=="0" if exist "%APP_DIR%\package.json" (
     echo  Aggiornamento...
-    cd /d "%HV_DIR%"
-    git pull
+    git -C "%HV_DIR%" pull >nul 2>&1
     echo  OK - Aggiornato
-    goto STEP4
+    set _SKIP_CLONE=1
 )
+if "!_SKIP_CLONE!"=="1" goto STEP4
 echo  Cloning...
 git clone https://github.com/mikeminer/HyperVibe.git "%HV_DIR%"
 if %errorlevel% neq 0 ( echo  ERRORE: Clone fallito. & pause & exit /b 1 )
@@ -339,8 +339,21 @@ if not exist "%THY_DIR%\main.py" (
 
 REM ·· Dipendenze Python ·······································
 echo  [*] Installazione dipendenze Python...
-python -m pip install --upgrade pip --quiet
-python -m pip install anthropic>=0.40.0 openai>=1.50.0 aiohttp>=3.9.0 --quiet
+
+REM Ripristina pip se corrotto (errore ~ip o modulo mancante)
+python -m ensurepip --upgrade --user >nul 2>&1
+python -m pip --version >nul 2>&1
+if %errorlevel% neq 0 (
+    echo  [*] pip non disponibile, tentativo ripristino...
+    curl -L --progress-bar -o "%TMP_DIR%\get-pip.py" "https://bootstrap.pypa.io/get-pip.py"
+    python "%TMP_DIR%\get-pip.py" --user --quiet
+)
+
+REM Aggiorna pip senza richiedere permessi admin
+python -m pip install --upgrade pip --user --quiet 2>nul
+
+REM Installa dipendenze engine con --user (nessun admin richiesto)
+python -m pip install "anthropic>=0.40.0" "openai>=1.50.0" "aiohttp>=3.9.0" --user --quiet
 if %errorlevel% neq 0 (
     echo  ERRORE: pip install fallito. Controlla la connessione internet.
     pause
@@ -526,7 +539,17 @@ REM ── Step 7: Scrivi .env ────────────────�
 echo [7/7] Salvataggio configurazione...
 if exist "%ENV_FILE%" del "%ENV_FILE%"
 
->>"%ENV_FILE%" echo PROVIDER=!PROVIDER!
+REM Scrivi PROVIDER compatibile con Node.js (accetta solo anthropic/ollama)
+if /i "!PROVIDER!"=="trihybrid" (
+    if not "!FINAL_A!"=="" (
+        >>"%ENV_FILE%" echo PROVIDER=anthropic
+    ) else (
+        >>"%ENV_FILE%" echo PROVIDER=ollama
+    )
+    >>"%ENV_FILE%" echo THY_PROVIDER=trihybrid
+) else (
+    >>"%ENV_FILE%" echo PROVIDER=!PROVIDER!
+)
 if not "!OLLAMA_MODEL!"==""         >>"%ENV_FILE%" echo OLLAMA_MODEL=!OLLAMA_MODEL!
 if not "!OLLAMA_MODEL!"==""         >>"%ENV_FILE%" echo OLLAMA_BASE_URL=http://localhost:11434
 if not "!FINAL_A!"==""              >>"%ENV_FILE%" echo ANTHROPIC_API_KEY=!FINAL_A!
@@ -593,26 +616,29 @@ set /p LAUNCH="  Avviare HyperVibe ora? (S/N): "
 if /i "!LAUNCH!" neq "S" goto END_NOLAN
 
 REM ── Sequenza di avvio per ogni provider ──────────────────────────────────────
-if "!PROVIDER!"=="trihybrid" (
-    echo.
-    echo  Avvio Tri-Hybrid Engine in background...
-    if not "!OLLAMA_MODEL!"=="" (
-        echo  [*] Avvio Ollama...
-        start /B ollama serve >nul 2>&1
-        ping -n 4 127.0.0.1 >nul 2>&1
-    )
-    echo  [*] Avvio engine Python (porta: background)...
-    start "HyperVibe - Tri-Hybrid Engine" /min cmd /k "cd /d !THY_DIR! && python main.py"
+if /i "!PROVIDER!"=="trihybrid" goto LAUNCH_TRIHYBRID
+if /i "!PROVIDER!"=="ollama" (
+    start /B ollama serve >nul 2>&1
     ping -n 3 127.0.0.1 >nul 2>&1
-    echo  [*] Avvio HyperVibe (Node.js)...
-    cd /d "%APP_DIR%"
-    call npm start
-    goto END_NOLAN
 )
-if "!PROVIDER!"=="ollama" ( start /B ollama serve >nul 2>&1 & ping -n 3 127.0.0.1 >nul 2>&1 )
 cd /d "%APP_DIR%"
 call npm start
+goto END_NOLAN
 
+:LAUNCH_TRIHYBRID
+echo.
+echo  Avvio Tri-Hybrid Engine in background...
+if not "!OLLAMA_MODEL!"=="" (
+    echo  [*] Avvio Ollama...
+    start /B ollama serve >nul 2>&1
+    ping -n 4 127.0.0.1 >nul 2>&1
+)
+echo  [*] Avvio engine Python in finestra separata...
+start "HyperVibe - Tri-Hybrid Engine" /min cmd /k "cd /d "!THY_DIR!" && python main.py"
+ping -n 3 127.0.0.1 >nul 2>&1
+echo  [*] Avvio HyperVibe Node.js...
+cd /d "%APP_DIR%"
+call npm start
 :END_NOLAN
 echo.
 pause
