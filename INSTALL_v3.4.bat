@@ -322,27 +322,55 @@ for /f "usebackq delims=" %%P in (`powershell -NoProfile -Command "Get-ChildItem
 
 if "!VSDEVCMD!"=="" (
     echo  Visual Studio 2022 non trovato. Installazione via winget...
-    winget --version >nul 2>&1
+   winget --version >nul 2>&1
     if %errorlevel% neq 0 (
-        echo  ERRORE: winget non disponibile.
-        echo  Installa VS2022 Community manualmente da:
-        echo  https://visualstudio.microsoft.com/vs/community/
-        echo  Workload richiesto: "Sviluppo desktop con C++"
-        pause
-        goto STEP5
+        echo  winget non disponibile. Download diretto VS2022...
+        curl -L --progress-bar -o "%TMP_DIR%\vs_community.exe" "https://aka.ms/vs/17/release/vs_community.exe"
+        if %errorlevel% neq 0 (
+            echo  ERRORE: Download VS2022 fallito. Controlla la connessione.
+            echo  Installa manualmente da:
+            echo  https://visualstudio.microsoft.com/vs/community/
+            pause
+            goto STEP5
+        )
+        echo  Installazione VS2022 Community con workload C++...
+        echo  (richiede 10-20 minuti, la finestra potrebbe non mostrare progressi)
+        "%TMP_DIR%\vs_community.exe" --wait --quiet --add Microsoft.VisualStudio.Workload.NativeDesktop --includeRecommended
+        if %errorlevel% neq 0 if %errorlevel% neq 3010 (
+            echo  ERRORE: Installazione VS2022 fallita (codice !errorlevel!).
+            echo  Installa manualmente da:
+            echo  https://visualstudio.microsoft.com/vs/community/
+            pause
+            goto STEP5
+        )
+        if %errorlevel% equ 3010 (
+            echo  OK - VS2022 installato. RIAVVIO RICHIESTO.
+            echo  Riavvia il PC e riesegui l'installer per continuare.
+            pause
+            goto STEP5
+        )
+        goto VS_SEARCH_RETRY
     )
     winget install Microsoft.VisualStudio.2022.Community --silent --override "--wait --quiet --add Microsoft.VisualStudio.Workload.NativeDesktop --includeRecommended"
-    if %errorlevel% neq 0 (
-        echo  ERRORE: Installazione VS2022 fallita.
+    if %errorlevel% neq 0 if %errorlevel% neq 3010 (
+        echo  ERRORE: Installazione VS2022 via winget fallita.
         echo  Installa manualmente da:
         echo  https://visualstudio.microsoft.com/vs/community/
         pause
         goto STEP5
     )
-    echo  OK - VS2022 Community installato. Ricerco VsDevCmd.bat...
+    if %errorlevel% equ 3010 (
+        echo  OK - VS2022 installato. RIAVVIO RICHIESTO.
+        echo  Riavvia il PC e riesegui l'installer per continuare.
+        pause
+        goto STEP5
+    )
+
+:VS_SEARCH_RETRY
+    echo  OK - VS2022 installato. Ricerco VsDevCmd.bat...
     for /f "usebackq delims=" %%P in (`powershell -NoProfile -Command "Get-ChildItem 'C:\Program Files\Microsoft Visual Studio\2022' -Recurse -Filter VsDevCmd.bat -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName" 2^>nul`) do set VSDEVCMD=%%P
     if "!VSDEVCMD!"=="" (
-        echo  ERRORE: VsDevCmd.bat non trovato anche dopo installazione.
+        echo  ERRORE: VsDevCmd.bat non trovato dopo installazione.
         echo  Riavvia il PC e riesegui l'installer.
         pause
         goto STEP5
