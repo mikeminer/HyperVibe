@@ -1,6 +1,6 @@
 @echo off
 setlocal EnableDelayedExpansion
-title HyperVibe Installer v3.4
+title HyperVibe Installer v3.5
 chcp 437 >nul
 
 set INSTALL_DIR=%~dp0
@@ -9,7 +9,7 @@ set TMP_DIR=%TEMP%\hypervibe_install
 
 echo.
 echo  ==========================================
-echo   HYPERVIBE - Installer v3.4
+echo   HYPERVIBE - Installer v3.5
 echo   Cartella: %INSTALL_DIR%
 echo  ==========================================
 echo.
@@ -219,20 +219,19 @@ REM ── Step 5: Scelta motore AI ──────────────�
 :STEP5
 echo [5/7] Motore AI...
 echo.
-echo   [1] Anthropic API       - Claude cloud, a pagamento, qualita' massima
-echo   [2] Qwen 2.5 14B        - Locale, gratuito, ~9GB RAM  (consigliato)
-echo   [3] Gemma 4 26B MoE     - Locale, gratuito, ~20GB RAM
-echo   [4] Tri-Hybrid Engine   - LLaMA+GPT+Claude con routing intelligente
+echo   [1] Solo API          - Claude cloud (Anthropic), a pagamento
+echo   [2] Solo Locale       - Modello offline gratuito (Ollama)
+echo   [3] Tri-Hybrid Engine - LLaMA+GPT+Claude con routing intelligente
 echo.
 set AI_CHOICE=
 :ASK_AI
-set /p AI_CHOICE="  Scelta [1/2/3/4]: "
+set /p AI_CHOICE="  Scelta [1/2/3]: "
 if "!AI_CHOICE!"=="1" goto AI_ANTHROPIC
-if "!AI_CHOICE!"=="2" goto AI_QWEN
-if "!AI_CHOICE!"=="3" goto AI_GEMMA
-if "!AI_CHOICE!"=="4" goto AI_TRIHYBRID
+if "!AI_CHOICE!"=="2" goto AI_LOCAL_MENU
+if "!AI_CHOICE!"=="3" goto AI_TRIHYBRID
 goto ASK_AI
 
+REM ── Solo API ─────────────────────────────────────────────────────────────────
 :AI_ANTHROPIC
 set PROVIDER=anthropic
 set OLLAMA_MODEL=
@@ -246,25 +245,72 @@ set /p NEW_A="  Anthropic API Key (INVIO per mantenere): "
 if "!NEW_A!"=="" (set FINAL_A=!CUR_ANTHROPIC!) else (set FINAL_A=!NEW_A!)
 goto STEP6
 
-:AI_QWEN
+REM ── Solo Locale: sottomenu modello ───────────────────────────────────────────
+:AI_LOCAL_MENU
+echo.
+echo   Seleziona il modello locale:
+echo.
+echo   ── LEGGERI (4-8 GB RAM) ─────────────────────────────
+echo   [1]  Qwen 2.5 7B        - qwen2.5:7b        ~5GB
+echo   [2]  Llama 3.2 3B       - llama3.2:3b        ~2GB
+echo   [3]  Llama 3.1 8B       - llama3.1:8b        ~5GB
+echo   [4]  Mistral 7B         - mistral:7b         ~4GB
+echo   [5]  Gemma 3 4B         - gemma3:4b          ~3GB
+echo   [6]  Phi-4 Mini         - phi4-mini          ~3GB
+echo.
+echo   ── MEDI (8-16 GB RAM) ───────────────────────────────
+echo   [7]  Qwen 2.5 14B       - qwen2.5:14b        ~9GB  (consigliato)
+echo   [8]  Mistral Nemo 12B   - mistral-nemo        ~8GB
+echo   [9]  Phi-4 14B          - phi4               ~9GB
+echo   [10] Llama 3.3 70B Q4   - llama3.3:70b-q4   ~12GB
+echo   [11] DeepSeek-R1 14B    - deepseek-r1:14b   ~10GB
+echo   [12] Qwen 2.5 Coder 14B - qwen2.5-coder:14b ~9GB
+echo.
+echo   ── PESANTI (20+ GB RAM) ─────────────────────────────
+echo   [13] Gemma 4 26B MoE    - gemma4:26b        ~20GB
+echo   [14] Qwen 2.5 32B       - qwen2.5:32b       ~22GB
+echo   [15] DeepSeek-R1 32B    - deepseek-r1:32b   ~22GB
+echo   [16] Llama 3.1 70B      - llama3.1:70b      ~48GB
+echo   [17] Mixtral 8x7B       - mixtral:8x7b      ~30GB
+echo.
+echo   [18] Nome custom (inserisci tag Ollama manualmente)
+echo.
+set LOCAL_CHOICE=
+:ASK_LOCAL
+set /p LOCAL_CHOICE="  Modello [1-18]: "
+if "!LOCAL_CHOICE!"=="1"  ( set OLLAMA_MODEL=qwen2.5:7b         & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="2"  ( set OLLAMA_MODEL=llama3.2:3b        & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="3"  ( set OLLAMA_MODEL=llama3.1:8b        & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="4"  ( set OLLAMA_MODEL=mistral:7b         & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="5"  ( set OLLAMA_MODEL=gemma3:4b          & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="6"  ( set OLLAMA_MODEL=phi4-mini          & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="7"  ( set OLLAMA_MODEL=qwen2.5:14b        & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="8"  ( set OLLAMA_MODEL=mistral-nemo       & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="9"  ( set OLLAMA_MODEL=phi4               & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="10" ( set OLLAMA_MODEL=llama3.3:70b-q4   & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="11" ( set OLLAMA_MODEL=deepseek-r1:14b   & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="12" ( set OLLAMA_MODEL=qwen2.5-coder:14b & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="13" ( set OLLAMA_MODEL=gemma4:26b         & set FORCE_UPDATE_OLLAMA=1 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="14" ( set OLLAMA_MODEL=qwen2.5:32b        & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="15" ( set OLLAMA_MODEL=deepseek-r1:32b   & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="16" ( set OLLAMA_MODEL=llama3.1:70b       & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="17" ( set OLLAMA_MODEL=mixtral:8x7b       & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="18" (
+    set /p OLLAMA_MODEL="  Tag Ollama (es. qwen2.5:72b): "
+    set FORCE_UPDATE_OLLAMA=0
+    goto LOCAL_OK
+)
+goto ASK_LOCAL
+
+:LOCAL_OK
 set PROVIDER=ollama
-set OLLAMA_MODEL=qwen2.5:14b
-set NEED_OLLAMA=1
-set FORCE_UPDATE_OLLAMA=0
 set FINAL_A=
 set CLAUDE_MODEL=
+echo  OK - Selezionato: !OLLAMA_MODEL!
 goto OLLAMA_SETUP
 
-:AI_GEMMA
-set PROVIDER=ollama
-set OLLAMA_MODEL=gemma4:26b
-set NEED_OLLAMA=1
-set FORCE_UPDATE_OLLAMA=1
-set FINAL_A=
-set CLAUDE_MODEL=
-
 REM ────────────────────────────────────────────────────────────────────────────
-REM [4] TRI-HYBRID ENGINE
+REM [3] TRI-HYBRID ENGINE
 REM  - Installa Python 3.11+ se necessario
 REM  - Copia tri_hybrid_engine/ nella cartella app se non presente
 REM  - Installa le dipendenze Python (anthropic, openai, aiohttp)
@@ -345,7 +391,7 @@ if not exist "%THY_DIR%\main.py" (
 REM ·· Dipendenze Python ·······································
 echo  [*] Installazione dipendenze Python...
 
-REM Ripristina pip se corrotto (errore ~ip o modulo mancante)
+REM Ripristina pip se corrotto
 python -m ensurepip --upgrade --user >nul 2>&1
 python -m pip --version >nul 2>&1
 if %errorlevel% neq 0 (
@@ -357,7 +403,7 @@ if %errorlevel% neq 0 (
 REM Aggiorna pip senza richiedere permessi admin
 python -m pip install --upgrade pip --user --quiet 2>nul
 
-REM Installa dipendenze engine con --user (nessun admin richiesto)
+REM Installa dipendenze engine
 python -m pip install "anthropic>=0.40.0" "openai>=1.50.0" "aiohttp>=3.9.0" "fastapi>=0.115.0" "uvicorn>=0.30.0" --user --quiet
 if %errorlevel% neq 0 (
     echo  ERRORE: pip install fallito. Controlla la connessione internet.
@@ -454,6 +500,7 @@ echo  OK - Tri-Hybrid Engine configurato
 
 goto STEP6
 
+REM ── Ollama setup condiviso (Solo Locale: Qwen / Gemma) ───────────────────────
 :OLLAMA_SETUP
 echo.
 echo  Verifica Ollama...
@@ -610,8 +657,10 @@ if "!PROVIDER!"=="trihybrid" (
     )
     echo   Soglie    : LLaMA^<!THY_LLAMA_THRESHOLD! / OpenAI^<!THY_OPENAI_THRESHOLD! / Claude else
     echo   Engine    : !THY_DIR!
+) else if "!PROVIDER!"=="ollama" (
+    echo   Motore AI : LOCALE - !OLLAMA_MODEL!
 ) else (
-    echo   Motore AI : !PROVIDER! !OLLAMA_MODEL!
+    echo   Motore AI : API - !CLAUDE_MODEL!
 )
 echo   Network   : !FINAL_NET!
 if "!INSTALL_AUTOTRADE_OK!"=="1" echo   Autotrade : INSTALLATO
@@ -646,6 +695,7 @@ ping -n 3 127.0.0.1 >nul 2>&1
 echo  [*] Avvio HyperVibe Node.js...
 cd /d "%APP_DIR%"
 call npm start
+
 :END_NOLAN
 echo.
 pause
