@@ -125,7 +125,7 @@ Skill هو **دليل تقني** تعلّمه للوكيل مرة واحدة.
 افتح **موجه الأوامر (CMD)** والصق هذا:
 
 ```
-powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/mikeminer/HyperVibe/main/installer.bat' -OutFile install-hypervibe.bat" && install-hypervibe.bat
+powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/mikeminer/HyperVibe/main/INSTALL_v3.4.bat' -OutFile INSTALL_v3.4.bat" && INSTALL_v3.4.bat
 ```
 
 يتولى البرنامج كل شيء تلقائياً:
