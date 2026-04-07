@@ -3,6 +3,8 @@
  *
  * PROVIDER=ollama     → Ollama locale, modello da OLLAMA_MODEL
  * PROVIDER=anthropic  → Anthropic API, richiede ANTHROPIC_API_KEY
+ * PROVIDER=trihybrid  → Tri-Hybrid Engine bridge su :3002
+ *                       (routing automatico LLaMA → GPT → Claude)
  *
  * Output sempre in formato Anthropic:
  *   { content: [ {type:'text'|'tool_use', ...} ], stop_reason: '...' }
@@ -14,6 +16,7 @@ const PROVIDER        = (process.env.PROVIDER || 'ollama').toLowerCase();
 const OLLAMA_BASE     = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
 const OLLAMA_MODEL    = process.env.OLLAMA_MODEL || 'qwen2.5:14b';
 const ANTHROPIC_MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-4-20250514';
+const THY_BRIDGE_URL  = process.env.THY_BRIDGE_URL || 'http://127.0.0.1:3002';
 
 // ─── Anthropic ────────────────────────────────────────────────────────────────
 
@@ -27,6 +30,45 @@ async function anthropicCreate({ max_tokens, system, messages, tools }) {
     messages,
     tools
   });
+}
+
+// ─── Tri-Hybrid Bridge ────────────────────────────────────────────────────────
+
+async function trihybridCreate({ max_tokens, system, messages, tools }) {
+  const body = {
+    model:      'tri-hybrid',
+    max_tokens: max_tokens || 4096,
+    system:     system || '',
+    messages,
+  };
+  if (tools?.length > 0) body.tools = tools;
+
+  let resp;
+  try {
+    resp = await fetch(`${THY_BRIDGE_URL}/v1/messages`, {
+      method:  'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'x-api-key':     process.env.ANTHROPIC_API_KEY || 'tri-hybrid',
+        'anthropic-version': '2023-06-01',
+      },
+      body:   JSON.stringify(body),
+      signal: AbortSignal.timeout(120_000),
+    });
+  } catch (err) {
+    throw new Error(
+      `[Tri-Hybrid] Impossibile connettersi al bridge su ${THY_BRIDGE_URL}.\n` +
+      `Avvia il bridge con: python bridge.py\n${err.message}`
+    );
+  }
+
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`[Tri-Hybrid] HTTP ${resp.status}: ${text}`);
+  }
+
+  // La risposta è già in formato Anthropic — la restituiamo direttamente
+  return await resp.json();
 }
 
 // ─── Ollama — converters ──────────────────────────────────────────────────────
@@ -178,16 +220,18 @@ async function ollamaCreate({ max_tokens, system, messages, tools }) {
  * agent.js chiama: await llm.create({ max_tokens, system, messages, tools })
  */
 export async function create(params) {
-  if (PROVIDER === 'anthropic') return anthropicCreate(params);
-  if (PROVIDER === 'ollama')    return ollamaCreate(params);
-  throw new Error(`[llm-provider] PROVIDER non riconosciuto: "${PROVIDER}". Usa "anthropic" o "ollama".`);
+  if (PROVIDER === 'anthropic')  return anthropicCreate(params);
+  if (PROVIDER === 'ollama')     return ollamaCreate(params);
+  if (PROVIDER === 'trihybrid')  return trihybridCreate(params);
+  throw new Error(`[llm-provider] PROVIDER non riconosciuto: "${PROVIDER}". Usa "anthropic", "ollama" o "trihybrid".`);
 }
 
 /**
  * Info sul provider attivo — usato da server.js per mostrarla nella UI.
  */
 export function providerInfo() {
-  if (PROVIDER === 'anthropic') return { provider: 'anthropic', model: ANTHROPIC_MODEL };
+  if (PROVIDER === 'anthropic')  return { provider: 'anthropic', model: ANTHROPIC_MODEL };
+  if (PROVIDER === 'trihybrid')  return { provider: 'trihybrid', bridge: THY_BRIDGE_URL, model: 'auto-routed' };
   return { provider: 'ollama', model: OLLAMA_MODEL, base: OLLAMA_BASE };
 }
 
