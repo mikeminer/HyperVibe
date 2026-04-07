@@ -1,6 +1,6 @@
 @echo off
 setlocal EnableDelayedExpansion
-title HyperVibe Installer v3.8
+title HyperVibe Installer v3.9
 chcp 437 >nul
 
 set INSTALL_DIR=%~dp0
@@ -9,7 +9,7 @@ set TMP_DIR=%TEMP%\hypervibe_install
 
 echo.
 echo  ==========================================
-echo   HYPERVIBE - Installer v3.8
+echo   HYPERVIBE - Installer v3.9
 echo   Cartella: %INSTALL_DIR%
 echo  ==========================================
 echo.
@@ -298,9 +298,8 @@ echo.
 echo   ATTENZIONE: tool/function calling NON supportato.
 echo   HyperVibe funzionera' in modalita' CHAT/ANALISI.
 echo.
-echo   PREREQUISITI OBBLIGATORI:
-echo     - Visual Studio con workload "Sviluppo desktop C++"
-echo     - LLVM/Clang  (richiesto da BitNet per la build CMake)
+echo   PREREQUISITI (installati automaticamente se mancanti):
+echo     - Visual Studio con workload "C++ desktop" + componente Clang/LLVM
 echo     - Python 3.11 (NON 3.12: torch 2.2.1 non supporta 3.12)
 echo       https://www.python.org/downloads/release/python-3119/
 echo.
@@ -313,18 +312,21 @@ echo.
 echo  [*] Ricerca Visual Studio con workload C++...
 set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
 set "VSDEVCMD="
+set "VS_INSTALL_PATH="
 
 if exist "%VSWHERE%" (
     for /f "usebackq delims=" %%P in (`"%VSWHERE%" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -find Common7\Tools\VsDevCmd.bat`) do set "VSDEVCMD=%%P"
+    for /f "usebackq delims=" %%P in (`"%VSWHERE%" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VS_INSTALL_PATH=%%P"
 )
 
 if not defined VSDEVCMD (
     echo  Visual Studio con workload C++ non trovato. Provo installazione...
-    winget install --id Microsoft.VisualStudio.2022.Community --silent --accept-package-agreements --accept-source-agreements --override "--wait --quiet --add Microsoft.VisualStudio.Workload.NativeDesktop --includeRecommended"
+    winget install --id Microsoft.VisualStudio.2022.Community --silent --accept-package-agreements --accept-source-agreements --override "--wait --quiet --add Microsoft.VisualStudio.Workload.NativeDesktop --add Microsoft.VisualStudio.ComponentGroup.NativeDesktop.Llvm.Clang --includeRecommended"
 )
 
 if not defined VSDEVCMD if exist "%VSWHERE%" (
     for /f "usebackq delims=" %%P in (`"%VSWHERE%" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -find Common7\Tools\VsDevCmd.bat`) do set "VSDEVCMD=%%P"
+    for /f "usebackq delims=" %%P in (`"%VSWHERE%" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VS_INSTALL_PATH=%%P"
 )
 
 if not defined VSDEVCMD (
@@ -350,64 +352,80 @@ if %errorlevel% neq 0 (
 )
 echo  OK - CMake trovato
 
-REM ·· LLVM/Clang ──────────────────────────────────────────────────────────────
-REM    FIX v3.8: winget restituisce errore anche per "nessun aggiornamento
-REM    disponibile", quindi non si usa errorlevel dopo winget. Si cerca clang
-REM    nei path fissi comuni prima e dopo l'installazione.
-echo  [*] Verifica LLVM/Clang...
+REM ·· clang-cl integrato in VS ────────────────────────────────────────────────
+REM    BitNet usa -T ClangCL che richiede clang-cl.exe DENTRO Visual Studio,
+REM    NON il clang standalone di LLVM. Sono componenti distinti.
+echo  [*] Verifica clang-cl integrato in Visual Studio...
+set "CLANGCL_EXE="
+if exist "%VSWHERE%" (
+    for /f "usebackq delims=" %%P in (`"%VSWHERE%" -latest -products * -find "VC\Tools\Llvm\x64\bin\clang-cl.exe" 2^>nul`) do set "CLANGCL_EXE=%%P"
+)
+
+if not defined CLANGCL_EXE (
+    REM Cerca anche nei path fissi VS comuni
+    if exist "!VS_INSTALL_PATH!\VC\Tools\Llvm\x64\bin\clang-cl.exe" (
+        set "CLANGCL_EXE=!VS_INSTALL_PATH!\VC\Tools\Llvm\x64\bin\clang-cl.exe"
+    )
+)
+
+if not defined CLANGCL_EXE (
+    echo  clang-cl non trovato in VS. Installazione componente LLVM per VS...
+    echo  Questa operazione puo' richiedere 5-10 minuti. Attendi.
+    echo.
+    REM Trova vs_installer.exe accanto a vswhere
+    set "VS_INSTALLER=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vs_installer.exe"
+    if not exist "!VS_INSTALLER!" (
+        echo  ERRORE: vs_installer.exe non trovato.
+        echo  Apri VS Installer manualmente:
+        echo    Modifica ^> Componenti singoli ^> cerca "Clang"
+        echo    ^> spunta "C++ Clang tools for Windows" ^> Modifica
+        pause
+        goto STEP5
+    )
+    "!VS_INSTALLER!" modify --installPath "!VS_INSTALL_PATH!" --add Microsoft.VisualStudio.ComponentGroup.NativeDesktop.Llvm.Clang --quiet --norestart
+    REM winget/vs_installer puo' restituire errore anche in caso di successo: non usare errorlevel
+    ping -n 8 127.0.0.1 >nul 2>&1
+
+    REM Riprova ricerca dopo installazione
+    if exist "%VSWHERE%" (
+        for /f "usebackq delims=" %%P in (`"%VSWHERE%" -latest -products * -find "VC\Tools\Llvm\x64\bin\clang-cl.exe" 2^>nul`) do set "CLANGCL_EXE=%%P"
+    )
+    if not defined CLANGCL_EXE (
+        if exist "!VS_INSTALL_PATH!\VC\Tools\Llvm\x64\bin\clang-cl.exe" (
+            set "CLANGCL_EXE=!VS_INSTALL_PATH!\VC\Tools\Llvm\x64\bin\clang-cl.exe"
+        )
+    )
+    if not defined CLANGCL_EXE (
+        echo.
+        echo  ERRORE: clang-cl.exe non trovato dopo installazione.
+        echo.
+        echo  Installa manualmente tramite VS Installer:
+        echo    Apri "Programmi ^> Visual Studio Installer"
+        echo    ^> Modifica ^> Componenti singoli
+        echo    ^> Cerca "Clang"
+        echo    ^> Spunta "C++ Clang tools for Windows"
+        echo    ^> Modifica
+        echo.
+        echo  Poi riesegui questo installer.
+        pause
+        goto STEP5
+    )
+)
+echo  OK - clang-cl trovato: !CLANGCL_EXE!
+
+REM ·· LLVM/clang standalone (per PATH, opzionale ma utile) ───────────────────
+REM    Non blocca la build: clang-cl in VS e' sufficiente per -T ClangCL
+echo  [*] Verifica LLVM/clang nel PATH...
 set "LLVM_BIN="
-
-REM 1) Prova clang nel PATH corrente
 clang --version >nul 2>&1
-if %errorlevel% equ 0 ( set "LLVM_BIN=inpath" & goto CLANG_OK )
-
-REM 2) Cerca nei path fissi (LLVM gia' installato ma non nel PATH di sessione)
+if %errorlevel% equ 0 ( set "LLVM_BIN=inpath" & goto LLVM_DONE )
 if exist "C:\Program Files\LLVM\bin\clang.exe"        set "LLVM_BIN=C:\Program Files\LLVM\bin"
 if exist "C:\Program Files (x86)\LLVM\bin\clang.exe"  set "LLVM_BIN=C:\Program Files (x86)\LLVM\bin"
 if exist "%LOCALAPPDATA%\Programs\LLVM\bin\clang.exe" set "LLVM_BIN=%LOCALAPPDATA%\Programs\LLVM\bin"
+if defined LLVM_BIN ( set "PATH=!LLVM_BIN!;!PATH!" & echo  OK - LLVM: !LLVM_BIN! & goto LLVM_DONE )
+echo  LLVM standalone non trovato (non bloccante, clang-cl in VS e' sufficiente)
 
-if defined LLVM_BIN (
-    set "PATH=!LLVM_BIN!;!PATH!"
-    clang --version >nul 2>&1
-    if %errorlevel% equ 0 goto CLANG_OK
-    set "LLVM_BIN="
-)
-
-REM 3) Non trovato: installa via winget (ignora exit code: segnala anche "gia' aggiornato")
-echo  Clang non trovato. Installazione LLVM via winget...
-echo  Questa operazione puo' richiedere qualche minuto...
-winget install --id LLVM.LLVM --silent --accept-package-agreements --accept-source-agreements
-REM NON controllare errorlevel qui - winget esce con errore anche per "no update"
-
-REM 4) Riprova path fissi dopo installazione
-if exist "C:\Program Files\LLVM\bin\clang.exe"        set "LLVM_BIN=C:\Program Files\LLVM\bin"
-if exist "C:\Program Files (x86)\LLVM\bin\clang.exe"  set "LLVM_BIN=C:\Program Files (x86)\LLVM\bin"
-if exist "%LOCALAPPDATA%\Programs\LLVM\bin\clang.exe" set "LLVM_BIN=%LOCALAPPDATA%\Programs\LLVM\bin"
-
-if not defined LLVM_BIN (
-    echo  ERRORE: clang.exe non trovato dopo installazione.
-    echo  Scarica manualmente: https://github.com/llvm/llvm-project/releases
-    echo  File: LLVM-xx.x.x-win64.exe
-    echo  Seleziona "Add LLVM to the system PATH for all users".
-    pause
-    goto STEP5
-)
-set "PATH=!LLVM_BIN!;!PATH!"
-clang --version >nul 2>&1
-if %errorlevel% neq 0 (
-    echo  ERRORE: clang.exe trovato in !LLVM_BIN! ma non eseguibile.
-    echo  Chiudi il terminale, riaprilo e riesegui l'installer.
-    pause
-    goto STEP5
-)
-
-:CLANG_OK
-for /f "tokens=1-4" %%a in ('clang --version 2^>^&1 ^| findstr /i "version"') do set CLANG_VER=%%d
-if "!LLVM_BIN!"=="inpath" (
-    echo  OK - Clang !CLANG_VER! (nel PATH di sistema)
-) else (
-    echo  OK - Clang !CLANG_VER! in !LLVM_BIN!
-)
+:LLVM_DONE
 
 REM ·· Python 3.11 obbligatorio (torch 2.2.1 non supporta 3.12+) ───────────────
 echo  [*] Verifica Python 3.11 per BitNet...
@@ -431,13 +449,6 @@ if exist "%LOCALAPPDATA%\Programs\Python\Python311\python.exe" (
 
 echo  Python 3.11 non trovato. Installazione in corso...
 winget install --id Python.Python.3.11 --silent --accept-package-agreements --accept-source-agreements
-if %errorlevel% neq 0 (
-    echo  ERRORE: Installazione Python 3.11 fallita.
-    echo  Scarica manualmente: https://www.python.org/downloads/release/python-3119/
-    echo  Seleziona "Add Python to PATH" durante l'installazione, poi riesegui.
-    pause
-    goto STEP5
-)
 set "PATH=%LOCALAPPDATA%\Programs\Python\Python311;%LOCALAPPDATA%\Programs\Python\Python311\Scripts;%PATH%"
 ping -n 3 127.0.0.1 >nul 2>&1
 
@@ -447,14 +458,13 @@ if exist "%LOCALAPPDATA%\Programs\Python\Python311\python.exe" (
     set "PYEXE=%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
     goto PYTHON_BITNET_OK
 )
-echo  ERRORE: Python 3.11 installato ma non raggiungibile.
-echo  Chiudi questo terminale, riaprilo e riesegui l'installer.
+echo  ERRORE: Python 3.11 non raggiungibile. Chiudi e riapri il terminale.
 pause
 goto STEP5
 
 :PYTHON_BITNET_OK
 for /f "tokens=2" %%v in ('!PYEXE! --version 2^>^&1') do set PY_BITNET_VER=%%v
-echo  OK - Python !PY_BITNET_VER! (usato per BitNet)
+echo  OK - Python !PY_BITNET_VER!
 
 !PYEXE! -c "import sys; sys.exit(0 if sys.version_info[:2]==(3,11) else 1)" >nul 2>&1
 if %errorlevel% neq 0 (
@@ -464,14 +474,15 @@ if %errorlevel% neq 0 (
     goto STEP5
 )
 
-REM ·· pip per Python 3.11 ─────────────────────────────────────────────────────
+REM ·· pip + huggingface-hub ───────────────────────────────────────────────────
 echo  [*] Aggiornamento pip Python 3.11...
 !PYEXE! -m ensurepip --upgrade >nul 2>&1
 !PYEXE! -m pip install --upgrade pip setuptools wheel --user --quiet --no-warn-script-location
 if %errorlevel% neq 0 ( echo  ERRORE: aggiornamento pip fallito. & pause & goto STEP5 )
 
 echo  [*] Installazione huggingface-hub...
-!PYEXE! -m pip install --upgrade huggingface_hub --user --quiet --no-warn-script-location
+REM Installa versione compatibile con transformers (< 1.0) per evitare conflitti
+!PYEXE! -m pip install "huggingface_hub>=0.34.0,<1.0" --user --quiet --no-warn-script-location
 if %errorlevel% neq 0 ( echo  ERRORE: pip install huggingface_hub fallito. & pause & goto STEP5 )
 echo  OK - huggingface-hub pronto
 
@@ -487,20 +498,18 @@ if not exist "%BITNET_DIR%\setup_env.py" (
     git -C "%BITNET_DIR%" pull >nul 2>&1
 )
 
-REM ·· Submoduli sempre aggiornati (llama.cpp + gguf-py) ──────────────────────
+REM ·· Submoduli sempre aggiornati ─────────────────────────────────────────────
 echo  [*] Inizializzazione submoduli BitNet (llama.cpp / gguf-py)...
 git -C "%BITNET_DIR%" submodule update --init --recursive
 if %errorlevel% neq 0 ( echo  ERRORE: submodule update fallito. & pause & goto STEP5 )
 echo  OK - Submoduli pronti
 
 REM ·· Build in Developer shell via bat temporaneo ─────────────────────────────
-REM    LLVM_BIN aggiunto al PATH dentro la shell per garantire clang a cmake
+REM    clang-cl in VS viene trovato automaticamente da -T ClangCL
+REM    una volta che VsDevCmd.bat e' stato chiamato correttamente
 set BITNET_BUILD_BAT=%TMP_DIR%\bitnet_build.bat
 (
     echo @echo off
-    if not "!LLVM_BIN!"=="inpath" (
-        echo set "PATH=!LLVM_BIN!;%%PATH%%"
-    )
     echo call "!VSDEVCMD!" -startdir=none -arch=x64 -host_arch=x64
     echo if errorlevel 1 exit /b 1
     echo cd /d "!BITNET_DIR!"
@@ -520,12 +529,11 @@ if %errorlevel% neq 0 (
     echo  ERRORE: Build BitNet fallita.
     echo  Controlla il log: !BITNET_DIR!\logs\generate_build_files.log
     echo.
-    echo  Cause comuni:
-    echo    - LLVM non nel PATH: !LLVM_BIN!
-    echo    - VS 2019 con LLVM esterno: verifica che clang.exe sia raggiungibile
+    echo  Causa piu' probabile: clang-cl non attivato correttamente in VS.
+    echo  Verifica che "C++ Clang tools for Windows" sia installato:
+    echo    VS Installer ^> Modifica ^> Componenti singoli ^> cerca Clang
     echo.
-    echo  Prova manualmente dal "Developer Command Prompt for VS":
-    echo    set PATH=!LLVM_BIN!;%%PATH%%
+    echo  Prova manualmente dal Developer Command Prompt for VS:
     echo    cd !BITNET_DIR!
     echo    !PYEXE! setup_env.py -md models/BitNet-b1.58-2B-4T -q i2_s
     echo.
@@ -578,7 +586,6 @@ echo  Download !OLLAMA_MODEL!...
 ollama pull !OLLAMA_MODEL!
 if %errorlevel% neq 0 ( echo  ERRORE: Download modello fallito. & pause & exit /b 1 )
 echo  OK - !OLLAMA_MODEL! scaricato
-REM FIX: goto esplicito, evita fall-through in AI_TRIHYBRID
 goto STEP6
 
 REM ── Tri-Hybrid Engine ────────────────────────────────────────────────────────
@@ -813,7 +820,7 @@ if /i "!PROVIDER!"=="trihybrid" (
 ) else if /i "!PROVIDER!"=="bitnet" (
     echo   Motore AI : BITNET CPU-ONLY - !BITNET_MODEL!
     echo   Python    : !PY_BITNET_VER!
-    echo   Clang     : !CLANG_VER!
+    echo   clang-cl  : !CLANGCL_EXE!
     echo   Tools     : CHAT/ANALISI ONLY
     echo   Porta     : !BITNET_PORT!
 ) else (
@@ -842,9 +849,6 @@ echo  Avvio BitNet server su porta !BITNET_PORT!...
 set BITNET_LAUNCH_BAT=%TEMP%\bitnet_launch.bat
 (
     echo @echo off
-    if not "!LLVM_BIN!"=="inpath" (
-        echo set "PATH=!LLVM_BIN!;%%PATH%%"
-    )
     echo call "!VSDEVCMD!" -startdir=none -arch=x64 -host_arch=x64
     echo cd /d "!BITNET_DIR!"
     echo !PYEXE! run_inference.py -m models/BitNet-b1.58-2B-4T/ggml-model-i2_s.gguf -p "You are a helpful trading assistant" --host 127.0.0.1 --port !BITNET_PORT!
@@ -858,7 +862,6 @@ goto END_NOLAN
 :LAUNCH_TRIHYBRID
 echo  Avvio Tri-Hybrid Engine...
 if not "!OLLAMA_MODEL!"=="" ( start /B ollama serve >nul 2>&1 & ping -n 4 127.0.0.1 >nul 2>&1 )
-REM FIX: variabile intermedia per evitare virgolette annidate con path con spazi
 set THY_CMD=cd /d !THY_DIR! && python bridge.py
 start "HyperVibe - Tri-Hybrid Bridge" /min cmd /k "!THY_CMD!"
 ping -n 3 127.0.0.1 >nul 2>&1
