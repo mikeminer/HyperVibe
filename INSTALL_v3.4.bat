@@ -1,6 +1,6 @@
 @echo off
 setlocal EnableDelayedExpansion
-title HyperVibe Installer v3.4
+title HyperVibe Installer v3.6
 chcp 437 >nul
 
 set INSTALL_DIR=%~dp0
@@ -9,7 +9,7 @@ set TMP_DIR=%TEMP%\hypervibe_install
 
 echo.
 echo  ==========================================
-echo   HYPERVIBE - Installer v3.4
+echo   HYPERVIBE - Installer v3.6
 echo   Cartella: %INSTALL_DIR%
 echo  ==========================================
 echo.
@@ -210,7 +210,7 @@ set /p NEW_A="  Anthropic API Key (INVIO per mantenere): "
 if "!NEW_A!"=="" (set FINAL_A=!CUR_ANTHROPIC!) else (set FINAL_A=!NEW_A!)
 goto STEP6
 
-REM ── Solo Locale: sottomenu modello (Ollama) ───────────────────────────────────
+REM ── Solo Locale: sottomenu modello (Ollama) ────────────────────────────────
 :AI_LOCAL_MENU
 echo.
 echo   Tutti i modelli elencati supportano tools/function calling.
@@ -281,11 +281,6 @@ echo  OK - Selezionato: !OLLAMA_MODEL!
 goto OLLAMA_SETUP
 
 REM ── BitNet CPU Engine ────────────────────────────────────────────────────────
-REM  Strategia anti-crash:
-REM  - Nessun cmd /c con virgolette annidate
-REM  - VS detection via powershell (piu' robusto)
-REM  - Build step scritto in bat temporaneo e chiamato via call
-REM  - Ogni errore fa goto STEP5 invece di exit
 :AI_BITNET
 set PROVIDER=bitnet
 set OLLAMA_MODEL=
@@ -299,27 +294,22 @@ echo.
 echo  ── BITNET CPU ENGINE ────────────────────────────────────────────────────
 echo   Inferenza 1-bit nativa Microsoft, nessuna GPU richiesta.
 echo   Modello: BitNet b1.58 2B4T, circa 1.2GB, solo CPU.
-echo   Vantaggi: 82 percento risparmio energetico, fino a 6x piu' veloce su x86.
 echo.
-echo   ATTENZIONE: tool/function calling NON ancora supportato ufficialmente.
-echo   HyperVibe funzionera' in modalita' CHAT/ANALISI:
-echo     Segnali e analisi testuali : OK
-echo     Esecuzione ordini autonoma : NON DISPONIBILE
+echo   ATTENZIONE: tool/function calling NON supportato.
+echo   HyperVibe funzionera' in modalita' CHAT/ANALISI.
 echo.
-echo   PREREQUISITO OBBLIGATORIO (da installare prima se assente):
-echo     Visual Studio 2022 con workload "Sviluppo desktop C++"
-echo     Scarica da: https://visualstudio.microsoft.com/it/downloads/
+echo   PREREQUISITI OBBLIGATORI:
+echo     - Visual Studio con workload "Sviluppo desktop C++"
+echo     - Python 3.11 (NON 3.12: torch 2.2.1 non supporta 3.12)
+echo       https://www.python.org/downloads/release/python-3119/
 echo.
 set BITNET_OK=
 set /p BITNET_OK="  Continuare con BitNet? (S/N): "
 if /i "!BITNET_OK!" neq "S" goto STEP5
 
-REM ·· Cerca VsDevCmd.bat via PowerShell ·······································
+REM ·· Cerca VsDevCmd.bat via vswhere ··········································
 echo.
-echo  [*] Ricerca Visual Studio 2022...
-set VSDEVCMD=
-echo.
-echo  [*] Ricerca Visual Studio 2022...
+echo  [*] Ricerca Visual Studio con workload C++...
 set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
 set "VSDEVCMD="
 
@@ -328,8 +318,7 @@ if exist "%VSWHERE%" (
 )
 
 if not defined VSDEVCMD (
-    echo  Visual Studio con workload C++ non trovato.
-    echo  Provo installazione...
+    echo  Visual Studio con workload C++ non trovato. Provo installazione...
     winget install --id Microsoft.VisualStudio.2022.Community --silent --accept-package-agreements --accept-source-agreements --override "--wait --quiet --add Microsoft.VisualStudio.Workload.NativeDesktop --includeRecommended"
 )
 
@@ -338,12 +327,11 @@ if not defined VSDEVCMD if exist "%VSWHERE%" (
 )
 
 if not defined VSDEVCMD (
-    echo  ERRORE: VsDevCmd.bat non trovato.
+    echo  ERRORE: VsDevCmd.bat non trovato. Installa VS con workload C++ e riesegui.
     pause
     goto STEP5
 )
-
-echo  OK - Trovato: %VSDEVCMD%
+echo  OK - Trovato: !VSDEVCMD!
 
 REM ·· CMake ····················································
 echo  [*] Verifica CMake...
@@ -361,97 +349,108 @@ if %errorlevel% neq 0 (
 )
 echo  OK - CMake trovato
 
-REM ·· Python + huggingface-cli ·················································
-echo  [*] Verifica Python...
-
+REM ·· Python 3.11 obbligatorio (torch 2.2.1 non supporta 3.12+) ··············
+echo  [*] Verifica Python 3.11 per BitNet...
+echo      torch 2.2.1 richiesto da BitNet non supporta Python 3.12+
+echo.
 set "PYEXE="
-where py >nul 2>&1
-if %errorlevel% equ 0 set "PYEXE=py -3"
 
-if not defined PYEXE (
-    where python >nul 2>&1
-    if %errorlevel% equ 0 set "PYEXE=python"
+REM Prova py launcher con 3.11
+py -3.11 --version >nul 2>&1
+if %errorlevel% equ 0 ( set "PYEXE=py -3.11" & goto PYTHON_BITNET_OK )
+
+REM Prova python3.11 diretto
+python3.11 --version >nul 2>&1
+if %errorlevel% equ 0 ( set "PYEXE=python3.11" & goto PYTHON_BITNET_OK )
+
+REM Prova path fissi comuni
+if exist "C:\Python311\python.exe" ( set "PYEXE=C:\Python311\python.exe" & goto PYTHON_BITNET_OK )
+if exist "%LOCALAPPDATA%\Programs\Python\Python311\python.exe" (
+    set "PYEXE=%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
+    goto PYTHON_BITNET_OK
 )
 
-if not defined PYEXE (
-    echo  ERRORE: Python non trovato.
-    echo  Installa Python 3 e seleziona "Add Python to PATH".
-    pause
-    goto STEP5
-)
-
-%PYEXE% --version
+REM Non trovato: installa via winget
+echo  Python 3.11 non trovato. Installazione in corso...
+winget install --id Python.Python.3.11 --silent --accept-package-agreements --accept-source-agreements
 if %errorlevel% neq 0 (
-    echo  ERRORE: Python presente ma non eseguibile correttamente.
+    echo  ERRORE: Installazione Python 3.11 fallita.
+    echo  Scarica manualmente: https://www.python.org/downloads/release/python-3119/
+    echo  Seleziona "Add Python to PATH" durante l'installazione, poi riesegui.
     pause
     goto STEP5
 )
+set "PATH=%LOCALAPPDATA%\Programs\Python\Python311;%LOCALAPPDATA%\Programs\Python\Python311\Scripts;%PATH%"
+ping -n 3 127.0.0.1 >nul 2>&1
 
-echo  [*] Verifica pip...
-%PYEXE% -m ensurepip --upgrade >nul 2>&1
-%PYEXE% -m pip --version >nul 2>&1
+py -3.11 --version >nul 2>&1
+if %errorlevel% equ 0 ( set "PYEXE=py -3.11" & goto PYTHON_BITNET_OK )
+if exist "%LOCALAPPDATA%\Programs\Python\Python311\python.exe" (
+    set "PYEXE=%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
+    goto PYTHON_BITNET_OK
+)
+
+echo  ERRORE: Python 3.11 installato ma non raggiungibile.
+echo  Chiudi questo terminale, riaprilo e riesegui l'installer.
+pause
+goto STEP5
+
+:PYTHON_BITNET_OK
+for /f "tokens=2" %%v in ('!PYEXE! --version 2^>^&1') do set PY_BITNET_VER=%%v
+echo  OK - Python !PY_BITNET_VER! (usato per BitNet)
+
+REM Verifica che sia effettivamente 3.11.x
+!PYEXE! -c "import sys; sys.exit(0 if sys.version_info[:2]==(3,11) else 1)" >nul 2>&1
 if %errorlevel% neq 0 (
-    echo  ERRORE: pip non disponibile per questo interprete Python.
+    echo  ERRORE: Python trovato ma non e' la versione 3.11.
+    echo  Installa Python 3.11: https://www.python.org/downloads/release/python-3119/
     pause
     goto STEP5
 )
 
-echo  [*] Aggiornamento pip/setuptools/wheel...
-%PYEXE% -m pip install --upgrade pip setuptools wheel --user
-if %errorlevel% neq 0 (
-    echo  ERRORE: aggiornamento pip fallito.
-    pause
-    goto STEP5
-)
+REM ·· pip per Python 3.11 ·····················································
+echo  [*] Aggiornamento pip Python 3.11...
+!PYEXE! -m ensurepip --upgrade >nul 2>&1
+!PYEXE! -m pip install --upgrade pip setuptools wheel --user --quiet
+if %errorlevel% neq 0 ( echo  ERRORE: aggiornamento pip fallito. & pause & goto STEP5 )
 
-echo  [*] Installazione huggingface-cli...
-%PYEXE% -m pip install --upgrade "huggingface_hub[cli]" --user
-if %errorlevel% neq 0 (
-    echo  ERRORE: pip install huggingface_hub fallito.
-    echo  Prova manualmente:
-    echo     %PYEXE% -m pip install --upgrade "huggingface_hub[cli]" --user
-    pause
-    goto STEP5
-)
+REM huggingface-hub senza extra 'cli' (incluso di default nelle versioni recenti)
+echo  [*] Installazione huggingface-hub...
+!PYEXE! -m pip install --upgrade huggingface_hub --user --quiet
+if %errorlevel% neq 0 ( echo  ERRORE: pip install huggingface_hub fallito. & pause & goto STEP5 )
+echo  OK - huggingface-hub pronto
 
-echo  OK - huggingface-cli pronto
-
-REM ·· Clone microsoft/BitNet ···················································
+REM ·· Clone microsoft/BitNet ··················································
 echo  [*] Verifica BitNet repo...
 if not exist "%BITNET_DIR%\setup_env.py" (
     echo  Clone microsoft/BitNet con submoduli, circa 500MB...
     git clone --recursive https://github.com/microsoft/BitNet.git "%BITNET_DIR%"
-    if %errorlevel% neq 0 (
-        echo  ERRORE: Clone BitNet fallito. Controlla la connessione internet.
-        pause
-        goto STEP5
-    )
+    if %errorlevel% neq 0 ( echo  ERRORE: Clone BitNet fallito. & pause & goto STEP5 )
     echo  OK - BitNet clonato
 ) else (
     echo  OK - BitNet gia' presente, aggiorno...
     git -C "%BITNET_DIR%" pull >nul 2>&1
-    git -C "%BITNET_DIR%" submodule update --recursive >nul 2>&1
 )
 
-REM ·· Dipendenze Python BitNet ·················································
-echo  [*] Installazione requirements.txt BitNet...
-cd /d "%BITNET_DIR%"
-python -m pip install -r requirements.txt --user
-if %errorlevel% neq 0 (
-    echo  ERRORE: pip install requirements.txt fallito.
-    pause
-    goto STEP5
-)
-echo  OK - Dipendenze BitNet installate
+REM ·· Submoduli sempre aggiornati (llama.cpp + gguf-py) ·····················
+echo  [*] Inizializzazione submoduli BitNet (llama.cpp / gguf-py)...
+git -C "%BITNET_DIR%" submodule update --init --recursive
+if %errorlevel% neq 0 ( echo  ERRORE: submodule update fallito. & pause & goto STEP5 )
+echo  OK - Submoduli pronti
 
-REM ·· Scrivi bat temporaneo per la build (evita virgolette annidate) ············
+REM ·· Build in Developer shell via bat temporaneo ····························
+REM    requirements.txt installato DENTRO la shell con il Python 3.11 corretto
 set BITNET_BUILD_BAT=%TMP_DIR%\bitnet_build.bat
-echo @echo off > "%BITNET_BUILD_BAT%"
-echo call "!VSDEVCMD!" -startdir=none -arch=x64 -host_arch=x64 >> "%BITNET_BUILD_BAT%"
-echo if errorlevel 1 exit /b 1 >> "%BITNET_BUILD_BAT%"
-echo cd /d "%BITNET_DIR%" >> "%BITNET_BUILD_BAT%"
-echo python setup_env.py -md models/BitNet-b1.58-2B-4T -q i2_s >> "%BITNET_BUILD_BAT%"
-echo exit /b %errorlevel% >> "%BITNET_BUILD_BAT%"
+(
+    echo @echo off
+    echo call "!VSDEVCMD!" -startdir=none -arch=x64 -host_arch=x64
+    echo if errorlevel 1 exit /b 1
+    echo cd /d "!BITNET_DIR!"
+    echo !PYEXE! -m pip install -r requirements.txt --user --quiet
+    echo if errorlevel 1 exit /b 1
+    echo !PYEXE! setup_env.py -md models/BitNet-b1.58-2B-4T -q i2_s
+    echo if errorlevel 1 exit /b 1
+) > "%BITNET_BUILD_BAT%"
 
 echo.
 echo  [*] Build BitNet + download modello, circa 1.2GB...
@@ -461,14 +460,21 @@ call "%BITNET_BUILD_BAT%"
 if %errorlevel% neq 0 (
     echo.
     echo  ERRORE: Build BitNet fallita.
-    echo  Prova manualmente dallo "Developer Command Prompt for VS 2022":
-    echo    cd %BITNET_DIR%
-    echo    python setup_env.py -md models/BitNet-b1.58-2B-4T -q i2_s
+    echo  Prova manualmente dal "Developer Command Prompt for VS":
+    echo    cd !BITNET_DIR!
+    echo    !PYEXE! setup_env.py -md models/BitNet-b1.58-2B-4T -q i2_s
     echo.
     pause
     goto STEP5
 )
 del "%BITNET_BUILD_BAT%" >nul 2>&1
+
+REM ·· Verifica .gguf prodotto ·················································
+if not exist "%BITNET_DIR%\models\BitNet-b1.58-2B-4T\ggml-model-i2_s.gguf" (
+    echo  ERRORE: .gguf non trovato dopo la build. Build incompleta.
+    pause
+    goto STEP5
+)
 echo  OK - BitNet compilato e modello pronto
 goto STEP6
 
@@ -507,6 +513,8 @@ echo  Download !OLLAMA_MODEL!...
 ollama pull !OLLAMA_MODEL!
 if %errorlevel% neq 0 ( echo  ERRORE: Download modello fallito. & pause & exit /b 1 )
 echo  OK - !OLLAMA_MODEL! scaricato
+REM FIX: goto esplicito, evita fall-through in AI_TRIHYBRID
+goto STEP6
 
 REM ── Tri-Hybrid Engine ────────────────────────────────────────────────────────
 :AI_TRIHYBRID
@@ -661,32 +669,34 @@ set /p NEW_TGC="      Valore: "
 if "!NEW_TGC!"=="" (set FINAL_TGC=!CUR_TG_CHAT!) else (set FINAL_TGC=!NEW_TGC!)
 echo.
 
-REM ── Step 7: Scrivi .env ──────────────────────────────────────────────────────
+REM ── Step 7: Scrivi .env (piatto, redirect a fine riga, niente if-else annidati)
 :STEP7
 echo [7/7] Salvataggio configurazione...
 if exist "%ENV_FILE%" del "%ENV_FILE%"
 
-REM -- PROVIDER line (calcola prima, scrivi dopo) --
-if /i "!PROVIDER!"=="trihybrid" (
-    if not "!FINAL_A!"=="" (
-        echo PROVIDER=anthropic>>"%ENV_FILE%"
-    ) else (
-        echo PROVIDER=ollama>>"%ENV_FILE%"
-    )
-    echo THY_PROVIDER=trihybrid>>"%ENV_FILE%"
-    echo ANTHROPIC_BASE_URL=http://127.0.0.1:3002>>"%ENV_FILE%"
-    goto WRITE_COMMON
-)
-if /i "!PROVIDER!"=="bitnet" (
-    echo PROVIDER=bitnet>>"%ENV_FILE%"
-    echo BITNET_DIR=!BITNET_DIR!>>"%ENV_FILE%"
-    echo BITNET_MODEL=!BITNET_MODEL!>>"%ENV_FILE%"
-    echo BITNET_PORT=!BITNET_PORT!>>"%ENV_FILE%"
-    echo BITNET_BASE_URL=http://127.0.0.1:!BITNET_PORT!>>"%ENV_FILE%"
-    echo BITNET_TOOLS_SUPPORTED=0>>"%ENV_FILE%"
-    goto WRITE_COMMON
-)
+if /i "!PROVIDER!"=="trihybrid" goto WRITE_TRIHYBRID_HEADER
+if /i "!PROVIDER!"=="bitnet"    goto WRITE_BITNET_HEADER
 echo PROVIDER=!PROVIDER!>>"%ENV_FILE%"
+goto WRITE_COMMON
+
+:WRITE_TRIHYBRID_HEADER
+if not "!FINAL_A!"=="" (
+    echo PROVIDER=anthropic>>"%ENV_FILE%"
+) else (
+    echo PROVIDER=ollama>>"%ENV_FILE%"
+)
+echo THY_PROVIDER=trihybrid>>"%ENV_FILE%"
+echo ANTHROPIC_BASE_URL=http://127.0.0.1:3002>>"%ENV_FILE%"
+goto WRITE_COMMON
+
+:WRITE_BITNET_HEADER
+echo PROVIDER=bitnet>>"%ENV_FILE%"
+echo BITNET_DIR=!BITNET_DIR!>>"%ENV_FILE%"
+echo BITNET_MODEL=!BITNET_MODEL!>>"%ENV_FILE%"
+echo BITNET_PORT=!BITNET_PORT!>>"%ENV_FILE%"
+echo BITNET_BASE_URL=http://127.0.0.1:!BITNET_PORT!>>"%ENV_FILE%"
+echo BITNET_TOOLS_SUPPORTED=0>>"%ENV_FILE%"
+goto WRITE_COMMON
 
 :WRITE_COMMON
 if not "!OLLAMA_MODEL!"=="" echo OLLAMA_MODEL=!OLLAMA_MODEL!>>"%ENV_FILE%"
@@ -704,11 +714,11 @@ if "!INSTALL_AUTOTRADE_OK!"=="1" (
     echo SIGNALS_DIR=!APP_DIR!\playbooks\signals>>"%ENV_FILE%"
 )
 
-REM -- Extra trihybrid --
 if /i "!PROVIDER!" neq "trihybrid" goto WRITE_DONE
-if not "!FINAL_OAI!"==""     echo OPENAI_API_KEY=!FINAL_OAI!>>"%ENV_FILE%"
+
+if not "!FINAL_OAI!"==""    echo OPENAI_API_KEY=!FINAL_OAI!>>"%ENV_FILE%"
 echo OPENAI_MODEL=!THY_OPENAI_MODEL!>>"%ENV_FILE%"
-if not "!OLLAMA_MODEL!"==""  echo LLAMA_MODEL=!OLLAMA_MODEL!>>"%ENV_FILE%"
+if not "!OLLAMA_MODEL!"=="" echo LLAMA_MODEL=!OLLAMA_MODEL!>>"%ENV_FILE%"
 echo CLAUDE_MODEL=!THY_CLAUDE_MODEL!>>"%ENV_FILE%"
 echo LLAMA_THRESHOLD=!THY_LLAMA_THRESHOLD!>>"%ENV_FILE%"
 echo OPENAI_THRESHOLD=!THY_OPENAI_THRESHOLD!>>"%ENV_FILE%"
@@ -727,15 +737,17 @@ rmdir /s /q "%TMP_DIR%" >nul 2>&1
 echo.
 echo  ==========================================
 echo   INSTALLAZIONE COMPLETATA
-if "!PROVIDER!"=="trihybrid" (
+if /i "!PROVIDER!"=="trihybrid" (
     echo   Motore AI : TRI-HYBRID ENGINE
     if not "!OLLAMA_MODEL!"=="" echo   Tier 1    : LLaMA - !OLLAMA_MODEL!
     if "!FINAL_OAI!"=="" ( echo   Tier 2    : OpenAI GPT (KEY NON INSERITA) ) else ( echo   Tier 2    : OpenAI !THY_OPENAI_MODEL! )
     if "!FINAL_A!"==""  ( echo   Tier 3    : Claude     (KEY NON INSERITA) ) else ( echo   Tier 3    : Claude !THY_CLAUDE_MODEL! )
-echo   Soglie    : LLaMA^<!THY_LLAMA_THRESHOLD! / OpenAI^<!THY_OPENAI_THRESHOLD! / Confidence^<!THY_CONFIDENCE!) else if "!PROVIDER!"=="ollama" (
+    echo   Soglie    : LLaMA^<!THY_LLAMA_THRESHOLD! / OpenAI^<!THY_OPENAI_THRESHOLD! / Confidence^<!THY_CONFIDENCE!
+) else if /i "!PROVIDER!"=="ollama" (
     echo   Motore AI : LOCALE (Ollama) - !OLLAMA_MODEL!
-) else if "!PROVIDER!"=="bitnet" (
+) else if /i "!PROVIDER!"=="bitnet" (
     echo   Motore AI : BITNET CPU-ONLY - !BITNET_MODEL!
+    echo   Python    : !PY_BITNET_VER!
     echo   Tools     : CHAT/ANALISI ONLY
     echo   Porta     : !BITNET_PORT!
 ) else (
@@ -760,12 +772,14 @@ call npm start
 goto END_NOLAN
 
 :LAUNCH_BITNET
-echo  Avvio BitNet server su porta %BITNET_PORT%...
+echo  Avvio BitNet server su porta !BITNET_PORT!...
 set BITNET_LAUNCH_BAT=%TEMP%\bitnet_launch.bat
-echo @echo off > "%BITNET_LAUNCH_BAT%"
-echo call "!VSDEVCMD!" -startdir=none -arch=x64 -host_arch=x64 >> "%BITNET_LAUNCH_BAT%"
-echo cd /d "%BITNET_DIR%" >> "%BITNET_LAUNCH_BAT%"
-echo python run_inference.py -m models/BitNet-b1.58-2B-4T/ggml-model-i2_s.gguf -p "You are a helpful trading assistant" --host 127.0.0.1 --port %BITNET_PORT% >> "%BITNET_LAUNCH_BAT%"
+(
+    echo @echo off
+    echo call "!VSDEVCMD!" -startdir=none -arch=x64 -host_arch=x64
+    echo cd /d "!BITNET_DIR!"
+    echo !PYEXE! run_inference.py -m models/BitNet-b1.58-2B-4T/ggml-model-i2_s.gguf -p "You are a helpful trading assistant" --host 127.0.0.1 --port !BITNET_PORT!
+) > "%BITNET_LAUNCH_BAT%"
 start "HyperVibe - BitNet Server" /min "%BITNET_LAUNCH_BAT%"
 ping -n 6 127.0.0.1 >nul 2>&1
 cd /d "%APP_DIR%"
@@ -775,7 +789,9 @@ goto END_NOLAN
 :LAUNCH_TRIHYBRID
 echo  Avvio Tri-Hybrid Engine...
 if not "!OLLAMA_MODEL!"=="" ( start /B ollama serve >nul 2>&1 & ping -n 4 127.0.0.1 >nul 2>&1 )
-start "HyperVibe - Tri-Hybrid Bridge" /min cmd /k "cd /d "%THY_DIR%" && python bridge.py"
+REM FIX: variabile intermedia per evitare virgolette annidate con path con spazi
+set THY_CMD=cd /d !THY_DIR! && python bridge.py
+start "HyperVibe - Tri-Hybrid Bridge" /min cmd /k "!THY_CMD!"
 ping -n 3 127.0.0.1 >nul 2>&1
 cd /d "%APP_DIR%"
 call npm start
