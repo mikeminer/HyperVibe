@@ -46,13 +46,13 @@ class Settings:
     MAX_ESCALATIONS: int = int(os.getenv("MAX_ESCALATIONS", "2"))
 
     # ── Token Limits ──────────────────────────────────────────────────────────
-    MAX_INPUT_TOKENS: int = int(os.getenv("MAX_INPUT_TOKENS", "3000"))
+    MAX_INPUT_TOKENS: int = int(os.getenv("MAX_INPUT_TOKENS", "800"))
     MAX_OUTPUT_TOKENS: int = int(os.getenv("MAX_OUTPUT_TOKENS", "1024"))
 
     # ── Timeouts (seconds) ────────────────────────────────────────────────────
     LLAMA_TIMEOUT_SECS: float = float(os.getenv("LLAMA_TIMEOUT_SECS", "60.0"))
     OPENAI_TIMEOUT_SECS: float = float(os.getenv("OPENAI_TIMEOUT_SECS", "30.0"))
-    CLAUDE_TIMEOUT_SECS: float = float(os.getenv("CLAUDE_TIMEOUT_SECS", "30.0"))
+    CLAUDE_TIMEOUT_SECS: float = float(os.getenv("CLAUDE_TIMEOUT_SECS", "180.0"))
 
     # ── Throughput ────────────────────────────────────────────────────────────
     CONCURRENT_REQUESTS: int = int(os.getenv("CONCURRENT_REQUESTS", "10"))
