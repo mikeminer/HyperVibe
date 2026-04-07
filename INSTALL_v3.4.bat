@@ -723,8 +723,7 @@ if "!PROVIDER!"=="trihybrid" (
     if not "!OLLAMA_MODEL!"=="" echo   Tier 1    : LLaMA - !OLLAMA_MODEL!
     if "!FINAL_OAI!"=="" ( echo   Tier 2    : OpenAI GPT (KEY NON INSERITA) ) else ( echo   Tier 2    : OpenAI !THY_OPENAI_MODEL! )
     if "!FINAL_A!"==""  ( echo   Tier 3    : Claude     (KEY NON INSERITA) ) else ( echo   Tier 3    : Claude !THY_CLAUDE_MODEL! )
-    echo   Soglie    : LLaMA^<!THY_LLAMA_THRESHOLD! / OpenAI^<!THY_OPENAI_THRESHOLD! / Claude else
-) else if "!PROVIDER!"=="ollama" (
+echo   Soglie    : LLaMA^<!THY_LLAMA_THRESHOLD! / OpenAI^<!THY_OPENAI_THRESHOLD! / Confidence^<!THY_CONFIDENCE!) else if "!PROVIDER!"=="ollama" (
     echo   Motore AI : LOCALE (Ollama) - !OLLAMA_MODEL!
 ) else if "!PROVIDER!"=="bitnet" (
     echo   Motore AI : BITNET CPU-ONLY - !BITNET_MODEL!
