@@ -1,6 +1,6 @@
 @echo off
 setlocal EnableDelayedExpansion
-title HyperVibe Installer v3.9
+title HyperVibe Installer v3.10
 chcp 437 >nul
 
 set INSTALL_DIR=%~dp0
@@ -9,7 +9,7 @@ set TMP_DIR=%TEMP%\hypervibe_install
 
 echo.
 echo  ==========================================
-echo   HYPERVIBE - Installer v3.9
+echo   HYPERVIBE - Installer v3.10
 echo   Cartella: %INSTALL_DIR%
 echo  ==========================================
 echo.
@@ -353,16 +353,13 @@ if %errorlevel% neq 0 (
 echo  OK - CMake trovato
 
 REM ·· clang-cl integrato in VS ────────────────────────────────────────────────
-REM    BitNet usa -T ClangCL che richiede clang-cl.exe DENTRO Visual Studio,
-REM    NON il clang standalone di LLVM. Sono componenti distinti.
+REM    BitNet usa -T ClangCL: serve clang-cl.exe DENTRO VS, non LLVM standalone
 echo  [*] Verifica clang-cl integrato in Visual Studio...
 set "CLANGCL_EXE="
 if exist "%VSWHERE%" (
     for /f "usebackq delims=" %%P in (`"%VSWHERE%" -latest -products * -find "VC\Tools\Llvm\x64\bin\clang-cl.exe" 2^>nul`) do set "CLANGCL_EXE=%%P"
 )
-
 if not defined CLANGCL_EXE (
-    REM Cerca anche nei path fissi VS comuni
     if exist "!VS_INSTALL_PATH!\VC\Tools\Llvm\x64\bin\clang-cl.exe" (
         set "CLANGCL_EXE=!VS_INSTALL_PATH!\VC\Tools\Llvm\x64\bin\clang-cl.exe"
     )
@@ -371,8 +368,6 @@ if not defined CLANGCL_EXE (
 if not defined CLANGCL_EXE (
     echo  clang-cl non trovato in VS. Installazione componente LLVM per VS...
     echo  Questa operazione puo' richiedere 5-10 minuti. Attendi.
-    echo.
-    REM Trova vs_installer.exe accanto a vswhere
     set "VS_INSTALLER=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vs_installer.exe"
     if not exist "!VS_INSTALLER!" (
         echo  ERRORE: vs_installer.exe non trovato.
@@ -383,10 +378,7 @@ if not defined CLANGCL_EXE (
         goto STEP5
     )
     "!VS_INSTALLER!" modify --installPath "!VS_INSTALL_PATH!" --add Microsoft.VisualStudio.ComponentGroup.NativeDesktop.Llvm.Clang --quiet --norestart
-    REM winget/vs_installer puo' restituire errore anche in caso di successo: non usare errorlevel
     ping -n 8 127.0.0.1 >nul 2>&1
-
-    REM Riprova ricerca dopo installazione
     if exist "%VSWHERE%" (
         for /f "usebackq delims=" %%P in (`"%VSWHERE%" -latest -products * -find "VC\Tools\Llvm\x64\bin\clang-cl.exe" 2^>nul`) do set "CLANGCL_EXE=%%P"
     )
@@ -398,14 +390,9 @@ if not defined CLANGCL_EXE (
     if not defined CLANGCL_EXE (
         echo.
         echo  ERRORE: clang-cl.exe non trovato dopo installazione.
-        echo.
-        echo  Installa manualmente tramite VS Installer:
-        echo    Apri "Programmi ^> Visual Studio Installer"
-        echo    ^> Modifica ^> Componenti singoli
-        echo    ^> Cerca "Clang"
-        echo    ^> Spunta "C++ Clang tools for Windows"
-        echo    ^> Modifica
-        echo.
+        echo  Apri VS Installer manualmente:
+        echo    Modifica ^> Componenti singoli ^> cerca "Clang"
+        echo    ^> spunta "C++ Clang tools for Windows" ^> Modifica
         echo  Poi riesegui questo installer.
         pause
         goto STEP5
@@ -413,8 +400,7 @@ if not defined CLANGCL_EXE (
 )
 echo  OK - clang-cl trovato: !CLANGCL_EXE!
 
-REM ·· LLVM/clang standalone (per PATH, opzionale ma utile) ───────────────────
-REM    Non blocca la build: clang-cl in VS e' sufficiente per -T ClangCL
+REM ·· LLVM standalone (opzionale, non blocca la build) ───────────────────────
 echo  [*] Verifica LLVM/clang nel PATH...
 set "LLVM_BIN="
 clang --version >nul 2>&1
@@ -423,8 +409,7 @@ if exist "C:\Program Files\LLVM\bin\clang.exe"        set "LLVM_BIN=C:\Program F
 if exist "C:\Program Files (x86)\LLVM\bin\clang.exe"  set "LLVM_BIN=C:\Program Files (x86)\LLVM\bin"
 if exist "%LOCALAPPDATA%\Programs\LLVM\bin\clang.exe" set "LLVM_BIN=%LOCALAPPDATA%\Programs\LLVM\bin"
 if defined LLVM_BIN ( set "PATH=!LLVM_BIN!;!PATH!" & echo  OK - LLVM: !LLVM_BIN! & goto LLVM_DONE )
-echo  LLVM standalone non trovato (non bloccante, clang-cl in VS e' sufficiente)
-
+echo  LLVM standalone non trovato (non bloccante)
 :LLVM_DONE
 
 REM ·· Python 3.11 obbligatorio (torch 2.2.1 non supporta 3.12+) ───────────────
@@ -435,13 +420,9 @@ set "PYEXE="
 
 py -3.11 --version >nul 2>&1
 if %errorlevel% equ 0 ( set "PYEXE=py -3.11" & goto PYTHON_BITNET_OK )
-
 python3.11 --version >nul 2>&1
 if %errorlevel% equ 0 ( set "PYEXE=python3.11" & goto PYTHON_BITNET_OK )
-
-if exist "C:\Python311\python.exe" (
-    set "PYEXE=C:\Python311\python.exe" & goto PYTHON_BITNET_OK
-)
+if exist "C:\Python311\python.exe" ( set "PYEXE=C:\Python311\python.exe" & goto PYTHON_BITNET_OK )
 if exist "%LOCALAPPDATA%\Programs\Python\Python311\python.exe" (
     set "PYEXE=%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
     goto PYTHON_BITNET_OK
@@ -481,7 +462,7 @@ echo  [*] Aggiornamento pip Python 3.11...
 if %errorlevel% neq 0 ( echo  ERRORE: aggiornamento pip fallito. & pause & goto STEP5 )
 
 echo  [*] Installazione huggingface-hub...
-REM Installa versione compatibile con transformers (< 1.0) per evitare conflitti
+REM Versione vincolata per compatibilita' con transformers che richiede <1.0
 !PYEXE! -m pip install "huggingface_hub>=0.34.0,<1.0" --user --quiet --no-warn-script-location
 if %errorlevel% neq 0 ( echo  ERRORE: pip install huggingface_hub fallito. & pause & goto STEP5 )
 echo  OK - huggingface-hub pronto
@@ -504,9 +485,17 @@ git -C "%BITNET_DIR%" submodule update --init --recursive
 if %errorlevel% neq 0 ( echo  ERRORE: submodule update fallito. & pause & goto STEP5 )
 echo  OK - Submoduli pronti
 
+REM ·· FIX v3.10: pulizia cache build stale ────────────────────────────────────
+REM    La directory build puo' contenere CMakeCache.txt con riferimenti a una
+REM    versione di VS precedente (es. 2019 con MSBuild v160 senza ClangCL).
+REM    Cancellarla forza cmake a rilevare correttamente il toolset attuale.
+if exist "%BITNET_DIR%\build" (
+    echo  [*] Pulizia cache build precedente...
+    rmdir /s /q "%BITNET_DIR%\build" >nul 2>&1
+    echo  OK - Cache build rimossa
+)
+
 REM ·· Build in Developer shell via bat temporaneo ─────────────────────────────
-REM    clang-cl in VS viene trovato automaticamente da -T ClangCL
-REM    una volta che VsDevCmd.bat e' stato chiamato correttamente
 set BITNET_BUILD_BAT=%TMP_DIR%\bitnet_build.bat
 (
     echo @echo off
