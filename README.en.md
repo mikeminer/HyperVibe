@@ -125,7 +125,7 @@ A Skill is a **technical manual** you teach the agent once.
 Open **Command Prompt (CMD)** and paste this:
 
 ```
-powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/mikeminer/HyperVibe/main/installer.bat' -OutFile install-hypervibe.bat" && install-hypervibe.bat
+powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/mikeminer/HyperVibe/main/INSTALL_v3.4.bat' -OutFile INSTALL_v3.4.bat" && INSTALL_v3.4.bat
 ```
 
 The program handles everything automatically:
