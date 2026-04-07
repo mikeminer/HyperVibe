@@ -666,52 +666,61 @@ REM ── Step 7: Scrivi .env ────────────────�
 echo [7/7] Salvataggio configurazione...
 if exist "%ENV_FILE%" del "%ENV_FILE%"
 
+REM -- PROVIDER line (calcola prima, scrivi dopo) --
 if /i "!PROVIDER!"=="trihybrid" (
-    if not "!FINAL_A!"=="" ( >>"%ENV_FILE%" echo PROVIDER=anthropic ) else ( >>"%ENV_FILE%" echo PROVIDER=ollama )
-    >>"%ENV_FILE%" echo THY_PROVIDER=trihybrid
-    >>"%ENV_FILE%" echo ANTHROPIC_BASE_URL=http://127.0.0.1:3002
-) else if /i "!PROVIDER!"=="bitnet" (
-    >>"%ENV_FILE%" echo PROVIDER=bitnet
-    >>"%ENV_FILE%" echo BITNET_DIR=%BITNET_DIR%
-    >>"%ENV_FILE%" echo BITNET_MODEL=%BITNET_MODEL%
-    >>"%ENV_FILE%" echo BITNET_PORT=%BITNET_PORT%
-    >>"%ENV_FILE%" echo BITNET_BASE_URL=http://127.0.0.1:%BITNET_PORT%
-    >>"%ENV_FILE%" echo BITNET_TOOLS_SUPPORTED=0
-) else (
-    >>"%ENV_FILE%" echo PROVIDER=!PROVIDER!
+    if not "!FINAL_A!"=="" (
+        echo PROVIDER=anthropic>>"%ENV_FILE%"
+    ) else (
+        echo PROVIDER=ollama>>"%ENV_FILE%"
+    )
+    echo THY_PROVIDER=trihybrid>>"%ENV_FILE%"
+    echo ANTHROPIC_BASE_URL=http://127.0.0.1:3002>>"%ENV_FILE%"
+    goto WRITE_COMMON
 )
+if /i "!PROVIDER!"=="bitnet" (
+    echo PROVIDER=bitnet>>"%ENV_FILE%"
+    echo BITNET_DIR=!BITNET_DIR!>>"%ENV_FILE%"
+    echo BITNET_MODEL=!BITNET_MODEL!>>"%ENV_FILE%"
+    echo BITNET_PORT=!BITNET_PORT!>>"%ENV_FILE%"
+    echo BITNET_BASE_URL=http://127.0.0.1:!BITNET_PORT!>>"%ENV_FILE%"
+    echo BITNET_TOOLS_SUPPORTED=0>>"%ENV_FILE%"
+    goto WRITE_COMMON
+)
+echo PROVIDER=!PROVIDER!>>"%ENV_FILE%"
 
-if not "!OLLAMA_MODEL!"==""  >>"%ENV_FILE%" echo OLLAMA_MODEL=!OLLAMA_MODEL!
-if not "!OLLAMA_MODEL!"==""  >>"%ENV_FILE%" echo OLLAMA_BASE_URL=http://localhost:11434
-if not "!FINAL_A!"==""       >>"%ENV_FILE%" echo ANTHROPIC_API_KEY=!FINAL_A!
-if not "!CLAUDE_MODEL!"==""  >>"%ENV_FILE%" echo CLAUDE_MODEL=!CLAUDE_MODEL!
->>"%ENV_FILE%" echo HL_WALLET_ADDRESS=!FINAL_W!
->>"%ENV_FILE%" echo HL_PRIVATE_KEY=!FINAL_K!
->>"%ENV_FILE%" echo HL_NETWORK=!FINAL_NET!
->>"%ENV_FILE%" echo PORT=3001
->>"%ENV_FILE%" echo TELEGRAM_BOT_TOKEN=!FINAL_TGT!
->>"%ENV_FILE%" echo TELEGRAM_CHAT_ID=!FINAL_TGC!
+:WRITE_COMMON
+if not "!OLLAMA_MODEL!"=="" echo OLLAMA_MODEL=!OLLAMA_MODEL!>>"%ENV_FILE%"
+if not "!OLLAMA_MODEL!"=="" echo OLLAMA_BASE_URL=http://localhost:11434>>"%ENV_FILE%"
+if not "!FINAL_A!"==""      echo ANTHROPIC_API_KEY=!FINAL_A!>>"%ENV_FILE%"
+if not "!CLAUDE_MODEL!"=="" echo CLAUDE_MODEL=!CLAUDE_MODEL!>>"%ENV_FILE%"
+echo HL_WALLET_ADDRESS=!FINAL_W!>>"%ENV_FILE%"
+echo HL_PRIVATE_KEY=!FINAL_K!>>"%ENV_FILE%"
+echo HL_NETWORK=!FINAL_NET!>>"%ENV_FILE%"
+echo PORT=3001>>"%ENV_FILE%"
+if not "!FINAL_TGT!"=="" echo TELEGRAM_BOT_TOKEN=!FINAL_TGT!>>"%ENV_FILE%"
+if not "!FINAL_TGC!"=="" echo TELEGRAM_CHAT_ID=!FINAL_TGC!>>"%ENV_FILE%"
 if "!INSTALL_AUTOTRADE_OK!"=="1" (
-    >>"%ENV_FILE%" echo AUTOTRADE_DIR=!TOOLS_DIR!\autotrade
-    >>"%ENV_FILE%" echo SIGNALS_DIR=!APP_DIR!\playbooks\signals
+    echo AUTOTRADE_DIR=!TOOLS_DIR!\autotrade>>"%ENV_FILE%"
+    echo SIGNALS_DIR=!APP_DIR!\playbooks\signals>>"%ENV_FILE%"
 )
 
-if "!PROVIDER!"=="trihybrid" (
-    if not "!FINAL_OAI!"==""     >>"%ENV_FILE%" echo OPENAI_API_KEY=!FINAL_OAI!
-    >>"%ENV_FILE%" echo OPENAI_MODEL=!THY_OPENAI_MODEL!
-    if not "!OLLAMA_MODEL!"==""  >>"%ENV_FILE%" echo LLAMA_MODEL=!OLLAMA_MODEL!
-    >>"%ENV_FILE%" echo CLAUDE_MODEL=!THY_CLAUDE_MODEL!
-    >>"%ENV_FILE%" echo LLAMA_THRESHOLD=!THY_LLAMA_THRESHOLD!
-    >>"%ENV_FILE%" echo OPENAI_THRESHOLD=!THY_OPENAI_THRESHOLD!
-    >>"%ENV_FILE%" echo CONFIDENCE_THRESHOLD=!THY_CONFIDENCE!
-    >>"%ENV_FILE%" echo MAX_ESCALATIONS=!THY_MAX_ESC!
-    >>"%ENV_FILE%" echo MAX_INPUT_TOKENS=3000
-    >>"%ENV_FILE%" echo MAX_OUTPUT_TOKENS=1024
-    >>"%ENV_FILE%" echo CONCURRENT_REQUESTS=10
-    >>"%ENV_FILE%" echo THY_ENGINE_DIR=!THY_DIR!
-    >>"%ENV_FILE%" echo LOG_DIR=!THY_DIR!\logs
-)
+REM -- Extra trihybrid --
+if /i "!PROVIDER!" neq "trihybrid" goto WRITE_DONE
+if not "!FINAL_OAI!"==""     echo OPENAI_API_KEY=!FINAL_OAI!>>"%ENV_FILE%"
+echo OPENAI_MODEL=!THY_OPENAI_MODEL!>>"%ENV_FILE%"
+if not "!OLLAMA_MODEL!"==""  echo LLAMA_MODEL=!OLLAMA_MODEL!>>"%ENV_FILE%"
+echo CLAUDE_MODEL=!THY_CLAUDE_MODEL!>>"%ENV_FILE%"
+echo LLAMA_THRESHOLD=!THY_LLAMA_THRESHOLD!>>"%ENV_FILE%"
+echo OPENAI_THRESHOLD=!THY_OPENAI_THRESHOLD!>>"%ENV_FILE%"
+echo CONFIDENCE_THRESHOLD=!THY_CONFIDENCE!>>"%ENV_FILE%"
+echo MAX_ESCALATIONS=!THY_MAX_ESC!>>"%ENV_FILE%"
+echo MAX_INPUT_TOKENS=3000>>"%ENV_FILE%"
+echo MAX_OUTPUT_TOKENS=1024>>"%ENV_FILE%"
+echo CONCURRENT_REQUESTS=10>>"%ENV_FILE%"
+echo THY_ENGINE_DIR=!THY_DIR!>>"%ENV_FILE%"
+echo LOG_DIR=!THY_DIR!\logs>>"%ENV_FILE%"
 
+:WRITE_DONE
 echo  OK - .env salvato
 rmdir /s /q "%TMP_DIR%" >nul 2>&1
 
