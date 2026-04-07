@@ -329,86 +329,82 @@ set BITNET_DIR=%HV_DIR%\bitnet
 echo.
 echo  ── BITNET CPU ENGINE ────────────────────────────────────────────────────
 echo   Inferenza 1-bit nativa, nessuna GPU richiesta.
-echo   Modello: BitNet b1.58 2B4T (unico modello pubblico, ~1.2GB)
-echo   Vantaggi: 82%% risparmio energetico, 2-6x piu' veloce su CPU x86
+echo   Modello: BitNet b1.58 2B4T (~1.2GB)
+echo   Vantaggi: 82%% risparmio energetico, fino a 6x piu' veloce su CPU x86
 echo.
 echo   ATTENZIONE: tool/function calling NON ancora supportato ufficialmente.
 echo   HyperVibe funzionera' in modalita' CHAT/ANALISI:
 echo     Segnali e analisi testuali : OK
 echo     Esecuzione ordini autonoma : NON DISPONIBILE
 echo.
-echo   Prerequisiti che verranno installati se assenti:
-echo     - Visual Studio 2022 Build Tools (~4GB)
-echo     - CMake 3.22+
-echo     - Python 3.9+
-echo     - Hugging Face CLI
+echo   PREREQUISITI RICHIESTI (installazione manuale se assenti):
+echo     - Visual Studio 2022 Community/BuildTools con "Sviluppo C++"
+echo       https://visualstudio.microsoft.com/it/downloads/
+echo     - CMake 3.22+  (winget install Kitware.CMake)
+echo     - Python 3.9+  (gia' verificato al passo precedente)
+echo     - Hugging Face CLI  (pip install huggingface_hub[cli])
 echo.
 set /p BITNET_OK="  Continuare con BitNet? (S/N): "
 if /i "!BITNET_OK!" neq "S" goto STEP5
 
-REM ·· Visual Studio 2022 ·······················································
+REM ·· Verifica VS2022 - solo check, NO auto-install ····························
 echo.
 echo  [*] Verifica Visual Studio 2022...
-set VS_INIT=0
-if exist "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat"   set VS_INIT=1
-if exist "C:\Program Files\Microsoft Visual Studio\2022\Professional\Common7\Tools\VsDevCmd.bat" set VS_INIT=1
-if exist "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"  set VS_INIT=1
-if exist "C:\Program Files\Microsoft Visual Studio\2022\BuildTools\Common7\Tools\VsDevCmd.bat"  set VS_INIT=1
+set VS_CMD=
+if exist "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat"   set "VS_CMD=C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat"
+if exist "C:\Program Files\Microsoft Visual Studio\2022\Professional\Common7\Tools\VsDevCmd.bat" set "VS_CMD=C:\Program Files\Microsoft Visual Studio\2022\Professional\Common7\Tools\VsDevCmd.bat"
+if exist "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"   set "VS_CMD=C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
+if exist "C:\Program Files\Microsoft Visual Studio\2022\BuildTools\Common7\Tools\VsDevCmd.bat"   set "VS_CMD=C:\Program Files\Microsoft Visual Studio\2022\BuildTools\Common7\Tools\VsDevCmd.bat"
 
-if "!VS_INIT!"=="0" (
-    echo  Visual Studio 2022 non trovato. Download Build Tools (~4GB)...
-    curl -L --progress-bar -o "%TMP_DIR%\vs_buildtools.exe" "https://aka.ms/vs/17/release/vs_buildtools.exe"
-    if %errorlevel% neq 0 ( echo  ERRORE: Download VS Build Tools fallito. & pause & exit /b 1 )
-    "%TMP_DIR%\vs_buildtools.exe" --quiet --wait --norestart ^
-        --add Microsoft.VisualStudio.Workload.VCTools ^
-        --add Microsoft.VisualStudio.Component.VC.CMake.Project ^
-        --includeRecommended
-    echo  OK - VS Build Tools installato.
-    set VS_INIT=1
+if "!VS_CMD!"=="" (
+    echo.
+    echo  ERRORE: Visual Studio 2022 non trovato.
+    echo  Installa Visual Studio 2022 Community (gratuito) con il workload
+    echo  "Sviluppo di applicazioni desktop con C++" da:
+    echo  https://visualstudio.microsoft.com/it/downloads/
+    echo.
+    echo  Dopo l'installazione riesegui questo installer.
+    pause
+    goto STEP5
 )
+echo  OK - VS2022 trovato: !VS_CMD!
 
-echo  Inizializzazione ambiente VS2022...
-if exist "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat" (
-    call "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat" -startdir=none -arch=x64 -host_arch=x64 >nul 2>&1
-) else if exist "C:\Program Files\Microsoft Visual Studio\2022\Professional\Common7\Tools\VsDevCmd.bat" (
-    call "C:\Program Files\Microsoft Visual Studio\2022\Professional\Common7\Tools\VsDevCmd.bat" -startdir=none -arch=x64 -host_arch=x64 >nul 2>&1
-) else if exist "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" (
-    call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" -startdir=none -arch=x64 -host_arch=x64 >nul 2>&1
-) else (
-    call "C:\Program Files\Microsoft Visual Studio\2022\BuildTools\Common7\Tools\VsDevCmd.bat" -startdir=none -arch=x64 -host_arch=x64 >nul 2>&1
+REM ·· Inizializza ambiente VS (senza call che puo' crashare la sessione) ········
+echo  [*] Inizializzazione ambiente di build...
+cmd /c "call "!VS_CMD!" -startdir=none -arch=x64 -host_arch=x64 && cmake --version" >nul 2>&1
+if %errorlevel% neq 0 (
+    echo  ERRORE: Impossibile inizializzare l'ambiente VS2022.
+    echo  Esegui questo installer dallo "Developer Command Prompt for VS 2022".
+    pause
+    goto STEP5
 )
-echo  OK - Visual Studio 2022 pronto
+echo  OK - Ambiente VS2022 inizializzato
 
-REM ·· CMake 3.22+ ··············································
+REM ·· CMake ····················································
 echo  [*] Verifica CMake...
 cmake --version >nul 2>&1
 if %errorlevel% neq 0 (
-    echo  Installazione CMake via winget...
-    winget install --id Kitware.CMake --silent --accept-package-agreements --accept-source-agreements
+    echo  CMake non trovato. Installazione via winget...
+    winget install --id Kitware.CMake --silent --accept-package-agreements --accept-source-agreements >nul 2>&1
     set "PATH=C:\Program Files\CMake\bin;%PATH%"
     cmake --version >nul 2>&1
-    if %errorlevel% neq 0 ( echo  ERRORE: CMake non installato. & pause & exit /b 1 )
+    if %errorlevel% neq 0 (
+        echo  ERRORE: CMake non installato. Installa manualmente da https://cmake.org
+        pause
+        goto STEP5
+    )
 )
 for /f "tokens=3" %%v in ('cmake --version 2^>nul ^| findstr /i "version"') do set CMAKE_VER=%%v
 echo  OK - CMake !CMAKE_VER!
 
 REM ·· Python + huggingface-cli ·················································
-echo  [*] Verifica Python...
-python --version >nul 2>&1
-if %errorlevel% neq 0 (
-    echo  Installazione Python 3.9 via winget...
-    winget install --id Python.Python.3.9 --silent --accept-package-agreements --accept-source-agreements
-    set "PATH=%LOCALAPPDATA%\Programs\Python\Python39;%LOCALAPPDATA%\Programs\Python\Python39\Scripts;%PATH%"
-    python --version >nul 2>&1
-    if %errorlevel% neq 0 ( echo  ERRORE: Python non installato. & pause & exit /b 1 )
-)
-for /f "tokens=2" %%v in ('python --version 2^>^&1') do set PY_VER=%%v
-echo  OK - Python !PY_VER!
-
 echo  [*] Installazione huggingface-cli...
-python -m pip install --upgrade pip --quiet 2>nul
-python -m pip install "huggingface_hub[cli]" --quiet
-if %errorlevel% neq 0 ( echo  ERRORE: pip install huggingface_hub fallito. & pause & exit /b 1 )
+python -m pip install "huggingface_hub[cli]" --quiet 2>nul
+if %errorlevel% neq 0 (
+    echo  ERRORE: pip install huggingface_hub fallito.
+    pause
+    goto STEP5
+)
 echo  OK - huggingface-cli pronto
 
 REM ·· Clone microsoft/BitNet ···················································
@@ -416,7 +412,11 @@ echo  [*] Verifica BitNet repo...
 if not exist "!BITNET_DIR!\setup_env.py" (
     echo  Clone microsoft/BitNet con submoduli (~500MB)...
     git clone --recursive https://github.com/microsoft/BitNet.git "!BITNET_DIR!"
-    if %errorlevel% neq 0 ( echo  ERRORE: Clone BitNet fallito. & pause & exit /b 1 )
+    if %errorlevel% neq 0 (
+        echo  ERRORE: Clone BitNet fallito. Controlla la connessione internet.
+        pause
+        goto STEP5
+    )
     echo  OK - BitNet clonato
 ) else (
     echo  OK - BitNet gia' presente, aggiorno...
@@ -428,24 +428,30 @@ REM ·· Dipendenze Python BitNet ·······················
 echo  [*] Installazione requirements.txt BitNet...
 cd /d "!BITNET_DIR!"
 python -m pip install -r requirements.txt --quiet
-if %errorlevel% neq 0 ( echo  ERRORE: pip install requirements.txt fallito. & pause & exit /b 1 )
+if %errorlevel% neq 0 (
+    echo  ERRORE: pip install requirements.txt fallito.
+    pause
+    goto STEP5
+)
 echo  OK - Dipendenze Python BitNet installate
 
-REM ·· Download modello + build (setup_env.py) ··································
+REM ·· Build + download modello (lanciato dentro Developer Command Prompt) ······
 echo.
 echo  [*] Download BitNet b1.58 2B4T + compilazione kernel...
 echo      (download ~1.2GB + build, richiede 5-15 minuti)
+echo      IMPORTANTE: se la build fallisce, riesegui dallo
+echo      "Developer Command Prompt for VS 2022" e lancia manualmente:
+echo      cd !BITNET_DIR! ^&^& python setup_env.py -md models/BitNet-b1.58-2B-4T -q i2_s
 echo.
-python setup_env.py -md models/BitNet-b1.58-2B-4T -q i2_s
+cmd /c "call "!VS_CMD!" -startdir=none -arch=x64 -host_arch=x64 && cd /d "!BITNET_DIR!" && python setup_env.py -md models/BitNet-b1.58-2B-4T -q i2_s"
 if %errorlevel% neq 0 (
     echo.
     echo  ERRORE: setup_env.py fallito.
-    echo  Possibili cause:
-    echo    - VsDevCmd.bat non inizializzato correttamente
-    echo    - CMake non trovato nel PATH
-    echo    - Connessione internet assente per download modello
-    echo  Prova ad eseguire dallo sviluppatore PowerShell VS2022 e riesegui.
-    pause & exit /b 1
+    echo  Prova a eseguire manualmente dallo Developer Command Prompt VS2022:
+    echo    cd !BITNET_DIR!
+    echo    python setup_env.py -md models/BitNet-b1.58-2B-4T -q i2_s
+    pause
+    goto STEP5
 )
 echo  OK - BitNet compilato e modello pronto
 echo  OK - BitNet Engine configurato
