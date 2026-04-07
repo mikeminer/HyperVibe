@@ -161,19 +161,36 @@ if %errorlevel% neq 0 (
 )
 echo  OK - @nktkas/hyperliquid ed ethers installati
 
-//  echo  Installazione Claude Code CLI...
-//  claude --version >nul 2>&1
-//  if %errorlevel% equ 0 (
-//   echo  OK - Claude Code CLI gia' presente
-//  ) else (
-//  call npm install -g @anthropic-ai/claude-code --silent
- // if %errorlevel% neq 0 (
-//      echo  ATTENZIONE: Claude Code CLI non installato.
-//       echo  Installa manualmente: npm install -g @anthropic-ai/claude-code
-//    ) else (
-//        echo  OK - Claude Code CLI installato
-    )
+echo  Installazione Claude Code CLI...
+call claude --version >nul 2>&1
+if %errorlevel% equ 0 goto CLAUDE_OK
+
+call npm.cmd --version >nul 2>&1
+if %errorlevel% neq 0 (
+    echo  ERRORE: npm non trovato. Installa Node.js prima di continuare.
+    pause
+    exit /b 1
 )
+
+echo  Installazione Claude Code CLI...
+call npm.cmd install -g @anthropic-ai/claude-code --silent
+if %errorlevel% neq 0 (
+    echo  ATTENZIONE: Claude Code CLI non installato.
+    echo  Installa manualmente: npm install -g @anthropic-ai/claude-code
+    pause
+    exit /b 1
+)
+
+call claude --version >nul 2>&1
+if %errorlevel% neq 0 (
+    echo  ERRORE: Claude Code CLI risulta non disponibile dopo l'installazione.
+    echo  Prova a chiudere e riaprire il terminale, poi riesegui lo script.
+    pause
+    exit /b 1
+)
+
+:CLAUDE_OK
+echo  OK - Claude Code CLI trovato
 
 set MISSING_SCRIPTS=0
 if not exist "%TOOLS_DIR%\autotrade-bridge.js" set MISSING_SCRIPTS=1
