@@ -1,6 +1,6 @@
 {
-  "version": "1.0",
-  "updated": "2026-04-07",
+  "version": "1.1",
+  "updated": "2026-04-08",
   "playbooks": [
     {
       "id": "hype-momentum-scalp",
@@ -85,6 +85,20 @@
         ],
         "npm": ["@nktkas/hyperliquid", "ethers"],
         "external": ["claude-code-cli", "autotrade (rv64m/autotrade)"]
+      }
+    },
+    {
+      "id": "qwen-momentum-rotation",
+      "name": "Qwen x Multi-Asset Momentum Rotation",
+      "description": "Ranks BTC, ETH, SOL, HYPE by relative momentum score every 60 minutes. Allocates to the leader, rotates when another asset overtakes. Single position at a time. Optimized for Qwen 2.5 7B via Ollama. Telegram approval required.",
+      "author": "pappardelle.eth",
+      "version": "1.0.0",
+      "allocation": 200,
+      "tags": ["multi-asset", "momentum", "rotation", "ollama", "qwen", "btc", "eth", "sol", "hype"],
+      "url": "https://raw.githubusercontent.com/mikeminer/HyperVibe/main/playbooks/qwen-momentum-rotation.md",
+      "previewUrl": "https://github.com/mikeminer/HyperVibe/blob/main/playbooks/qwen-momentum-rotation.md",
+      "requires": {
+        "skills": ["qwen-trader", "funding-rate-filter", "drawdown-guard"]
       }
     }
   ]
