@@ -107,7 +107,7 @@ export async function createApp(config) {
     initTelegram({
       token, chatId,
       onApprove: async (approvalId) => {
-        const approval = Permissions.approve(approvalId);
+        const approval = await Permissions.approve(approvalId);
         if (!approval) return;
         broadcast({ type: 'approval_resolved', approval });
         try {
