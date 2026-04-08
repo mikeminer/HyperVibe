@@ -97,27 +97,29 @@ export async function sendApprovalMessage(approval) {
 export async function sendExecutionNotification(approval, txResult) {
   if (!_token || !_chatId) return;
 
+  const coin = approval?.coin ?? approval?.symbol ?? '???';
+  const side = approval?.side ?? '???';
+  const size = approval?.size ?? '???';
+
   const fill = txResult?.response?.data?.statuses?.[0]?.filled;
-  const err  = txResult?.error ?? txResult?.response?.data?.statuses?.[0]?.error;
+  const err  = txResult?.error
+             ?? txResult?.response?.data?.statuses?.[0]?.error
+             ?? (typeof txResult?.response === 'string' ? txResult.response : null);
 
   let text;
   if (err) {
-    text = `❌ *Trade Failed*\n${approval.side} ${approval.size} ${approval.coin}\n\`${err}\``;
+    text = `❌ *Trade Failed*\n${side} ${size} ${coin}\n\`${err}\``;
   } else if (fill) {
-    text = `✅ *Trade Executed*\n${approval.side} ${fill.totalSz} ${approval.coin} @ $${parseFloat(fill.avgPx).toFixed(4)}\nFee: $${parseFloat(fill.fee ?? 0).toFixed(4)}`;
+    text = `✅ *Trade Executed*\n${side} ${fill.totalSz} ${coin} @ $${parseFloat(fill.avgPx).toFixed(4)}\nFee: $${parseFloat(fill.fee ?? 0).toFixed(4)}`;
   } else {
-    text = `✅ *Order Submitted*\n${approval.side} ${approval.size} ${approval.coin}`;
+    text = `✅ *Order Submitted*\n${side} ${size} ${coin}`;
   }
 
   try {
     await fetch(`${BASE(_token)}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id:    _chatId,
-        text,
-        parse_mode: 'Markdown',
-      }),
+      body: JSON.stringify({ chat_id: _chatId, text, parse_mode: 'Markdown' }),
     });
   } catch {}
 }
