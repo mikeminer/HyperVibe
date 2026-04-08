@@ -1399,7 +1399,7 @@ function deriveAddress(pk) {
     box.style.display = 'block';
     if (matches) { box.style.background = 'var(--green-dim)'; box.style.border = '1px solid rgba(0,255,136,0.3)'; box.style.color = 'var(--green)'; box.innerHTML = `✓ Chiave valida — corrisponde al wallet address<br><span style="color:var(--text2);font-size:10px">${derived}</span>`; }
     else if (walletInput) { box.style.background = 'var(--red-dim)'; box.style.border = '1px solid rgba(255,51,102,0.3)'; box.style.color = 'var(--red)'; box.innerHTML = `⚠ Questa chiave appartiene a un indirizzo diverso:<br><span style="font-size:10px;word-break:break-all">Chiave → <strong>${derived}</strong></span><br><span style="font-size:10px;word-break:break-all">Wallet  → <strong>${walletInput}</strong></span><br><span style="font-size:10px;opacity:0.8">Se vuoi usare questa chiave, aggiorna anche il Wallet Address sopra.</span>`; }
-    else { box.style.background = 'var(--cyan-dim)'; box.style.border = '1px solid rgba(0,212,255,0.25)'; box.style.color = 'var(--cyan)'; box.innerHTML = `Indirizzo derivato dalla chiave:<br><strong style="word-break:break-all">${derived}</strong>`; }
+    else { box.style.background = 'var(--cyan-dim)'; box.style.border = '1px solid rgba(0,212,255,0.25)'; box.style.color = 'var(--cyan)'; box.innerHTML = `Indirizzo derivato dalla chiave:<br><strong style="word-break:break-all">${derived}</strong><br><span style="font-size:10px;opacity:0.8">Wallet Address verrà compilato automaticamente al salvataggio.</span>`; }
   } catch(e) { box.style.display = 'block'; box.style.background = 'var(--red-dim)'; box.style.border = '1px solid rgba(255,51,102,0.3)'; box.style.color = 'var(--red)'; box.innerHTML = '✗ Chiave privata non valida: ' + e.message; }
 }
 
@@ -1409,16 +1409,42 @@ async function saveSettings() {
   const pk = document.getElementById('s-pk').value.trim();
   const vault = document.getElementById('s-vault').value.trim();
   const apiKey = document.getElementById('s-anthropic-key').value.trim();
-  if (wallet) body.walletAddress = wallet;
-  if (pk) body.privateKey = pk;
-  if (vault) body.vaultAddress = vault;
-  if (apiKey) body.anthropicKey = apiKey;
   const tgToken = document.getElementById('s-tg-token').value.trim();
   const tgChatId = document.getElementById('s-tg-chatid').value.trim();
+
+  if (wallet && !wallet.startsWith('0x')) { showSettingsStatus('✗ Wallet address must start with 0x', 'error'); return; }
+  if (pk && !pk.startsWith('0x')) { showSettingsStatus('✗ Private key must start with 0x', 'error'); return; }
+
+  // If a private key is entered, derive its address and validate/auto-fill
+  if (pk) {
+    let derived;
+    try {
+      derived = new ethers.Wallet(pk).address;
+    } catch(e) {
+      showSettingsStatus('✗ Private key non valida: ' + e.message, 'error'); return;
+    }
+    if (wallet && derived.toLowerCase() !== wallet.toLowerCase()) {
+      showSettingsStatus(
+        `✗ Mismatch: la private key appartiene a ${derived}, non a ${wallet}. Correggi il Wallet Address o inserisci la chiave giusta.`,
+        'error'
+      ); return;
+    }
+    // Auto-fill wallet from derived address if not set
+    if (!wallet) {
+      document.getElementById('s-wallet').value = derived;
+      body.walletAddress = derived;
+    } else {
+      body.walletAddress = wallet;
+    }
+    body.privateKey = pk;
+  } else {
+    if (wallet) body.walletAddress = wallet;
+  }
+
+  if (vault) body.vaultAddress = vault;
+  if (apiKey) body.anthropicKey = apiKey;
   if (tgToken) body.telegramToken = tgToken;
   if (tgChatId) body.telegramChatId = tgChatId;
-  if (wallet && !wallet.startsWith('0x')) { showSettingsStatus('Wallet address must start with 0x', 'error'); return; }
-  if (pk && !pk.startsWith('0x')) { showSettingsStatus('Private key must start with 0x', 'error'); return; }
   try {
     const res = await fetch('/api/settings', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
     const data = await res.json();
