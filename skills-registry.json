@@ -61,6 +61,22 @@
   "tags": ["hype", "fees", "onchain", "burn", "buyback", "signal"],
   "url": "https://raw.githubusercontent.com/mikeminer/HyperVibe/main/skills/hype-fee-monitor.md",
   "previewUrl": "https://github.com/mikeminer/HyperVibe/blob/main/skills/hype-fee-monitor.md"
-}
+},
+    {
+      "id": "qwen-trader",
+      "name": "Qwen Trader Protocol",
+      "description": "Structured trading protocol optimized for Qwen 2.5 7B (Ollama). Step-by-step checklist with explicit tool call examples. Ensures correct order construction without Claude API.",
+      "author": "pappardelle.eth",
+      "version": "1.0.0",
+      "tags": [
+        "ollama",
+        "qwen",
+        "local",
+        "trading",
+        "protocol"
+      ],
+      "url": "https://raw.githubusercontent.com/mikeminer/HyperVibe/main/skills/qwen-trader.md",
+      "previewUrl": "https://github.com/mikeminer/HyperVibe/blob/main/skills/qwen-trader.md"
+    }
   ]
 }
