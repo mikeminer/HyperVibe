@@ -1,5 +1,5 @@
 {
-  "version": "1.1",
+  "version": "1.2",
   "updated": "2026-04-08",
   "playbooks": [
     {
@@ -9,7 +9,12 @@
       "author": "pappardelle.eth",
       "version": "1.0.0",
       "allocation": 15,
-      "tags": ["hype", "momentum", "scalp", "small-account"],
+      "tags": [
+        "hype",
+        "momentum",
+        "scalp",
+        "small-account"
+      ],
       "url": "https://raw.githubusercontent.com/mikeminer/HyperVibe/main/playbooks/hype-momentum-scalp.md",
       "previewUrl": "https://github.com/mikeminer/HyperVibe/blob/main/playbooks/hype-momentum-scalp.md"
     },
@@ -20,7 +25,11 @@
       "author": "pappardelle.eth",
       "version": "1.0.0",
       "allocation": 20,
-      "tags": ["funding", "arbitrage", "market-neutral"],
+      "tags": [
+        "funding",
+        "arbitrage",
+        "market-neutral"
+      ],
       "url": "https://raw.githubusercontent.com/mikeminer/HyperVibe/main/playbooks/funding-arbitrage.md",
       "previewUrl": "https://github.com/mikeminer/HyperVibe/blob/main/playbooks/funding-arbitrage.md"
     },
@@ -31,7 +40,12 @@
       "author": "pappardelle.eth",
       "version": "1.0.0",
       "allocation": 30,
-      "tags": ["btc", "eth", "trend", "swing"],
+      "tags": [
+        "btc",
+        "eth",
+        "trend",
+        "swing"
+      ],
       "url": "https://raw.githubusercontent.com/mikeminer/HyperVibe/main/playbooks/btc-eth-trend.md",
       "previewUrl": "https://github.com/mikeminer/HyperVibe/blob/main/playbooks/btc-eth-trend.md"
     },
@@ -42,7 +56,11 @@
       "author": "pappardelle.eth",
       "version": "1.0.0",
       "allocation": 15,
-      "tags": ["autonomous", "openclaw", "multi-coin"],
+      "tags": [
+        "autonomous",
+        "openclaw",
+        "multi-coin"
+      ],
       "url": "https://raw.githubusercontent.com/mikeminer/HyperVibe/main/playbooks/openclaw-autonomous.md",
       "previewUrl": "https://github.com/mikeminer/HyperVibe/blob/main/playbooks/openclaw-autonomous.md"
     },
@@ -53,7 +71,11 @@
       "author": "pappardelle.eth",
       "version": "1.0.0",
       "allocation": 10,
-      "tags": ["breakout", "scanner", "momentum"],
+      "tags": [
+        "breakout",
+        "scanner",
+        "momentum"
+      ],
       "url": "https://raw.githubusercontent.com/mikeminer/HyperVibe/main/playbooks/top-mover-breakout.md",
       "previewUrl": "https://github.com/mikeminer/HyperVibe/blob/main/playbooks/top-mover-breakout.md"
     },
@@ -64,7 +86,16 @@
       "author": "pappardelle.eth",
       "version": "1.0.0",
       "allocation": 0,
-      "tags": ["hype", "fee-monitor", "burn", "buyback", "signal-engine", "onchain", "price-prediction", "hyperevm"],
+      "tags": [
+        "hype",
+        "fee-monitor",
+        "burn",
+        "buyback",
+        "signal-engine",
+        "onchain",
+        "price-prediction",
+        "hyperevm"
+      ],
       "url": "https://raw.githubusercontent.com/mikeminer/HyperVibe/main/playbooks/hypePricePrediction.md",
       "previewUrl": "https://github.com/mikeminer/HyperVibe/blob/main/playbooks/hypePricePrediction.md"
     },
@@ -75,7 +106,14 @@
       "author": "pappardelle.eth",
       "version": "1.0.0",
       "allocation": 25,
-      "tags": ["research", "backtest", "autonomous", "multi-coin", "autotrade", "signal-engine"],
+      "tags": [
+        "research",
+        "backtest",
+        "autonomous",
+        "multi-coin",
+        "autotrade",
+        "signal-engine"
+      ],
       "url": "https://raw.githubusercontent.com/mikeminer/HyperVibe/main/playbooks/autotrade-research.md",
       "previewUrl": "https://github.com/mikeminer/HyperVibe/blob/main/playbooks/autotrade-research.md",
       "requires": {
@@ -83,8 +121,14 @@
           "hypervibe/tools/autotrade/autotrade-bridge.js",
           "hypervibe/tools/autotrade/signal-loader.js"
         ],
-        "npm": ["@nktkas/hyperliquid", "ethers"],
-        "external": ["claude-code-cli", "autotrade (rv64m/autotrade)"]
+        "npm": [
+          "@nktkas/hyperliquid",
+          "ethers"
+        ],
+        "external": [
+          "claude-code-cli",
+          "autotrade (rv64m/autotrade)"
+        ]
       }
     },
     {
@@ -94,11 +138,51 @@
       "author": "pappardelle.eth",
       "version": "1.0.0",
       "allocation": 200,
-      "tags": ["multi-asset", "momentum", "rotation", "ollama", "qwen", "btc", "eth", "sol", "hype"],
+      "tags": [
+        "multi-asset",
+        "momentum",
+        "rotation",
+        "ollama",
+        "qwen",
+        "btc",
+        "eth",
+        "sol",
+        "hype"
+      ],
       "url": "https://raw.githubusercontent.com/mikeminer/HyperVibe/main/playbooks/qwen-momentum-rotation.md",
       "previewUrl": "https://github.com/mikeminer/HyperVibe/blob/main/playbooks/qwen-momentum-rotation.md",
       "requires": {
-        "skills": ["qwen-trader", "funding-rate-filter", "drawdown-guard"]
+        "skills": [
+          "qwen-trader",
+          "funding-rate-filter",
+          "drawdown-guard"
+        ]
+      }
+    },
+    {
+      "id": "qwen-spot-dca",
+      "name": "Qwen x Spot DCA",
+      "description": "Template DCA spot configurabile: coin, allocazione, importo per ordine, frequenza e condizione di entrata (ALWAYS / PRICE_DIP / MOMENTUM_WEAK / FUNDING_NEGATIVE / CUSTOM) tutti personalizzabili. Accumulo puro, niente short, niente leva. Ottimizzato per Qwen 2.5 7B via Ollama.",
+      "author": "pappardelle.eth",
+      "version": "1.0.0",
+      "allocation": 0,
+      "tags": [
+        "dca",
+        "spot",
+        "accumulation",
+        "ollama",
+        "qwen",
+        "template",
+        "configurable"
+      ],
+      "url": "https://raw.githubusercontent.com/mikeminer/HyperVibe/main/playbooks/qwen-spot-dca.md",
+      "previewUrl": "https://github.com/mikeminer/HyperVibe/blob/main/playbooks/qwen-spot-dca.md",
+      "requires": {
+        "skills": [
+          "qwen-trader",
+          "funding-rate-filter",
+          "drawdown-guard"
+        ]
       }
     }
   ]
