@@ -452,17 +452,18 @@ export const TOOL_DEFINITIONS = [
   // ── Write tools ───────────────────────────────────────────────────────────
   {
     name: 'place_order',
-    description: 'Queue a trade for approval. Not executed until user approves.',
+    // FIX: size is now USDC notional — handler converts to coin quantity automatically
+    description: 'Queue a trade for approval. Not executed until user approves. Size is in USDC notional value — the handler converts to coin quantity automatically. Minimum size: 11 USDC.',
     input_schema: {
       type: 'object',
       properties: {
-        coin:        { type: 'string' },
+        coin:        { type: 'string', description: 'Coin name, e.g. HYPE, BTC, ETH, SOL' },
         side:        { type: 'string', enum: ['BUY','SELL'] },
-        size:        { type: 'number', description: 'Size in coin units' },
+        size:        { type: 'number', description: 'Position size in USDC notional value (e.g. 50 = 50 USDC worth). Minimum 11 USDC. Do NOT use coin quantity.' },
         order_type:  { type: 'string', enum: ['MARKET','LIMIT'], default: 'MARKET' },
-        price:       { type: 'number' },
+        price:       { type: 'number', description: 'Limit price in USD (only for LIMIT orders)' },
         reduce_only: { type: 'boolean', default: false },
-        reasoning:   { type: 'string' },
+        reasoning:   { type: 'string', description: 'One sentence explaining why you are placing this trade' },
         playbook_id: { type: 'string' },
       },
       required: ['coin','side','size','reasoning'],
@@ -597,22 +598,42 @@ export async function handleTool(name, input, { api, signer, walletAddress, vaul
     case 'load_autotrade_signal':  return toolLoadAutotradeSignal(input);
 
     // ── Write tools ─────────────────────────────────────────────────────────
+
+    // FIX: place_order now accepts USDC notional size and converts to coin quantity.
+    // Added: await on Permissions.queue, minimum 11 USDC check, USDC→coin conversion.
     case 'place_order': {
-      const approval = Permissions.queue({
-        playbookId:  input.playbook_id ?? playbookContext?.id ?? null,
+      if (!signer) throw new Error('No signer — add HL_PRIVATE_KEY in Settings');
+      const usdcSize = parseFloat(input.size);
+      if (isNaN(usdcSize) || usdcSize < 11) {
+        throw new Error(`Size too small: ${input.size} USDC. Minimum is 11 USDC.`);
+      }
+      const midPx   = await api.getPrice(input.coin);
+      const asset   = await api.getAssetInfo(input.coin);
+      const coinQty = HyperliquidSigner.formatSize(usdcSize / midPx, asset.szDecimals);
+      const approval = await Permissions.queue({
+        playbookId: input.playbook_id ?? playbookContext?.id ?? null,
+        coin:       input.coin,
+        side:       input.side,
+        size:       coinQty,
+        orderType:  input.order_type ?? 'MARKET',
+        price:      input.price ?? null,
+        reduceOnly: input.reduce_only ?? false,
+        reasoning:  input.reasoning,
+      });
+      return {
+        queued:      true,
+        approval_id: approval.id,
         coin:        input.coin,
         side:        input.side,
-        size:        input.size,
-        orderType:   input.order_type ?? 'MARKET',
-        price:       input.price ?? null,
-        reduceOnly:  input.reduce_only ?? false,
-        reasoning:   input.reasoning,
-      });
-      return { queued: true, approval_id: approval.id, message: `Trade queued — ${input.side} ${input.size} ${input.coin}. Awaiting approval.` };
+        usdc_size:   usdcSize,
+        coin_qty:    coinQty,
+        price:       midPx,
+        message:     `Trade queued — ${input.side} ${coinQty} ${input.coin} (~${usdcSize} USDC @ $${midPx}). Awaiting approval.`,
+      };
     }
 
     case 'place_exit_orders': {
-      const approval = Permissions.queue({
+      const approval = await Permissions.queue({
         playbookId:  playbookContext?.id ?? null,
         coin:        input.coin,
         side:        'EXIT_ORDERS',
@@ -633,7 +654,7 @@ export async function handleTool(name, input, { api, signer, walletAddress, vaul
     }
 
     case 'cancel_order': {
-      const approval = Permissions.queue({
+      const approval = await Permissions.queue({
         coin: input.coin, side: 'CANCEL', size: String(input.order_id),
         orderType: 'CANCEL', reasoning: input.reasoning,
       });
@@ -641,7 +662,7 @@ export async function handleTool(name, input, { api, signer, walletAddress, vaul
     }
 
     case 'set_leverage': {
-      const approval = Permissions.queue({
+      const approval = await Permissions.queue({
         coin: input.coin, side: 'SET_LEVERAGE', size: String(input.leverage),
         orderType: 'SET_LEVERAGE', reasoning: input.reasoning,
       });
