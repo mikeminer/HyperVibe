@@ -540,7 +540,7 @@ if %errorlevel% neq 0 (
 echo  [*] Analisi hardware in corso... (pochi secondi)
 echo.
 
-llmfit recommend --use-case general -n 3 > "%LLMFIT_OUT%" 2>nul
+llmfit recommend --use-case general --runtime llamacpp -n 5 > "%LLMFIT_OUT%" 2>nul
 if %errorlevel% neq 0 (
     echo  ERRORE: llmfit recommend fallito. Continuo con selezione manuale.
     goto AI_LOCAL_MENU
@@ -555,18 +555,31 @@ if exist "%LLMFIT_PS%" del "%LLMFIT_PS%"
 >>"%LLMFIT_PS%" echo if (-not $models -or $models.Count -eq 0) { Write-Output 'NOMODEL'; exit }
 >>"%LLMFIT_PS%" echo function Map-ToOllama($name) {
 >>"%LLMFIT_PS%" echo     $n = $name.ToLower()
+>>"%LLMFIT_PS%" echo     # Salta modelli AWQ/GPTQ/MLX — non compatibili con Ollama
+>>"%LLMFIT_PS%" echo     if ($n -match 'awq|gptq|mlx') { return $null }
+>>"%LLMFIT_PS%" echo     # Qwen2.5 Coder
 >>"%LLMFIT_PS%" echo     if ($n -match 'qwen2\.5-coder.*?(\d+)b') { return "qwen2.5-coder:$($Matches[1])b" }
->>"%LLMFIT_PS%" echo     if ($n -match 'qwen2\.5.*?(\d+\.?\d*)b') { $s=$Matches[1]; if ($s -eq '0.5') { return 'qwen2.5:0.5b' }; return "qwen2.5:${s}b" }
+>>"%LLMFIT_PS%" echo     # Qwen2.5
+>>"%LLMFIT_PS%" echo     if ($n -match 'qwen2\.5.*?(\d+\.?\d*)b') { $s=$Matches[1]; return "qwen2.5:${s}b" }
+>>"%LLMFIT_PS%" echo     # Qwen3 MoE (es. Qwen3-30B-A3B, Qwen3-235B-A22B)
+>>"%LLMFIT_PS%" echo     if ($n -match 'qwen3.*?(\d+)b-a(\d+)b') { return "qwen3:$($Matches[1])b-a$($Matches[2])b" }
+>>"%LLMFIT_PS%" echo     if ($n -match 'qwen3\.5.*?(\d+)b-a(\d+)b') { return "qwen3:$($Matches[1])b-a$($Matches[2])b" }
+>>"%LLMFIT_PS%" echo     # Qwen3 standard
 >>"%LLMFIT_PS%" echo     if ($n -match 'qwen3.*?(\d+)b') { return "qwen3:$($Matches[1])b" }
+>>"%LLMFIT_PS%" echo     # Llama
 >>"%LLMFIT_PS%" echo     if ($n -match 'llama.?3\.3.*?(\d+)b') { return "llama3.3:$($Matches[1])b" }
 >>"%LLMFIT_PS%" echo     if ($n -match 'llama.?3\.2.*?(\d+)b') { return "llama3.2:$($Matches[1])b" }
 >>"%LLMFIT_PS%" echo     if ($n -match 'llama.?3\.1.*?(\d+)b') { return "llama3.1:$($Matches[1])b" }
+>>"%LLMFIT_PS%" echo     # Gemma
 >>"%LLMFIT_PS%" echo     if ($n -match 'gemma.?4.*?(\d+)b') { return "gemma4:$($Matches[1])b" }
 >>"%LLMFIT_PS%" echo     if ($n -match 'gemma.?3.*?(\d+)b') { return "gemma3:$($Matches[1])b" }
+>>"%LLMFIT_PS%" echo     # Phi-4
 >>"%LLMFIT_PS%" echo     if ($n -match 'phi.?4.?mini') { return 'phi4-mini' }
 >>"%LLMFIT_PS%" echo     if ($n -match 'phi.?4.*?(\d+)b') { return "phi4:$($Matches[1])b" }
+>>"%LLMFIT_PS%" echo     # Mistral
 >>"%LLMFIT_PS%" echo     if ($n -match 'mistral.?nemo') { return 'mistral-nemo' }
 >>"%LLMFIT_PS%" echo     if ($n -match 'mistral.*?7b') { return 'mistral:7b' }
+>>"%LLMFIT_PS%" echo     # Granite
 >>"%LLMFIT_PS%" echo     if ($n -match 'granite.*?8b') { return 'granite3.2:8b' }
 >>"%LLMFIT_PS%" echo     return $null
 >>"%LLMFIT_PS%" echo }
