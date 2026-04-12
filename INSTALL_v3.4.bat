@@ -1,6 +1,6 @@
 @echo off
 setlocal EnableDelayedExpansion
-title HyperVibe Installer v3.11
+title HyperVibe Installer v3.12
 chcp 437 >nul
 
 set INSTALL_DIR=%~dp0
@@ -9,7 +9,7 @@ set TMP_DIR=%TEMP%\hypervibe_install
 
 echo.
 echo  ==========================================
-echo   HYPERVIBE - Installer v3.11
+echo   HYPERVIBE - Installer v3.12
 echo   Cartella: %INSTALL_DIR%
 echo  ==========================================
 echo.
@@ -29,6 +29,7 @@ if exist "%INSTALL_DIR%\hypervibe\package.json" (
 
 set ENV_FILE=%APP_DIR%\.env
 set TOOLS_DIR=%APP_DIR%\tools\autotrade
+set VIBE_TOOLS_DIR=%APP_DIR%\tools\vibe-trading
 set THY_DIR=%APP_DIR%\tri_hybrid_engine
 
 REM ── Fix automatico: corregge PROVIDER=trihybrid in .env gia' esistenti ───────
@@ -131,7 +132,7 @@ echo   Richiede ~200MB. Necessario per il Playbook "Autotrade Strategy Research"
 echo.
 set INSTALL_AUTOTRADE=
 set /p INSTALL_AUTOTRADE="  Installare il modulo Autotrade? (S/N): "
-if /i "!INSTALL_AUTOTRADE!" neq "S" goto STEP5
+if /i "!INSTALL_AUTOTRADE!" neq "S" goto STEP4C
 echo.
 
 mkdir "%TOOLS_DIR%" >nul 2>&1
@@ -140,7 +141,7 @@ echo  Cartella tools creata: %TOOLS_DIR%
 echo  Inizializzazione submodule autotrade...
 cd /d "%HV_DIR%"
 git submodule update --init --recursive
-if %errorlevel% neq 0 ( echo  ERRORE: submodule update fallito. Continuo senza modulo. & goto STEP5 )
+if %errorlevel% neq 0 ( echo  ERRORE: submodule update fallito. Continuo senza modulo. & goto STEP4C )
 echo  OK - autotrade submodule inizializzato
 
 if not exist "%TOOLS_DIR%\package.json" (
@@ -156,7 +157,7 @@ if not exist "%TOOLS_DIR%\package.json" (
 
 cd /d "%TOOLS_DIR%"
 call npm install @nktkas/hyperliquid@latest ethers@latest --silent
-if %errorlevel% neq 0 ( echo  ERRORE: npm install tools fallito. Continuo senza modulo. & goto STEP5 )
+if %errorlevel% neq 0 ( echo  ERRORE: npm install tools fallito. Continuo senza modulo. & goto STEP4C )
 echo  OK - @nktkas/hyperliquid ed ethers installati
 
 call claude --version >nul 2>&1
@@ -178,6 +179,206 @@ mkdir "%APP_DIR%\playbooks\signals" >nul 2>&1
 echo  OK - Cartella playbooks\signals creata
 echo.
 set INSTALL_AUTOTRADE_OK=1
+
+REM ── Step 4c: Vibe-Trading Integration ────────────────────────────────────────
+:STEP4C
+echo.
+echo [4c/7] Vibe-Trading Research Engine (opzionale)...
+echo   Installa il motore di ricerca multi-agente Vibe-Trading.
+echo   Swarm disponibili: crypto_trading_desk, risk_committee.
+echo   Richiede Python 3.11+ e ~500MB.
+echo.
+set INSTALL_VIBE=
+set /p INSTALL_VIBE="  Installare il modulo Vibe-Trading? (S/N): "
+if /i "!INSTALL_VIBE!" neq "S" goto STEP5
+echo.
+
+REM ·· Verifica Python ─────────────────────────────────────────────────────────
+echo  [*] Verifica Python 3.11+...
+set "VIBE_PYEXE="
+python --version >nul 2>&1
+if %errorlevel% equ 0 (
+    python -c "import sys; sys.exit(0 if sys.version_info>=(3,11) else 1)" >nul 2>&1
+    if !errorlevel! equ 0 ( set "VIBE_PYEXE=python" & goto VIBE_PY_OK )
+)
+py -3.11 --version >nul 2>&1
+if %errorlevel% equ 0 ( set "VIBE_PYEXE=py -3.11" & goto VIBE_PY_OK )
+if exist "%LOCALAPPDATA%\Programs\Python\Python311\python.exe" (
+    set "VIBE_PYEXE=%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
+    goto VIBE_PY_OK
+)
+
+echo  Python 3.11+ non trovato. Installazione...
+winget install --id Python.Python.3.11 --silent --accept-package-agreements --accept-source-agreements
+set "PATH=%LOCALAPPDATA%\Programs\Python\Python311;%LOCALAPPDATA%\Programs\Python\Python311\Scripts;%PATH%"
+ping -n 4 127.0.0.1 >nul 2>&1
+if exist "%LOCALAPPDATA%\Programs\Python\Python311\python.exe" (
+    set "VIBE_PYEXE=%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
+    goto VIBE_PY_OK
+)
+echo  ERRORE: Python non installato. Vibe-Trading saltato.
+goto STEP5
+
+:VIBE_PY_OK
+for /f "tokens=2" %%v in ('!VIBE_PYEXE! --version 2^>^&1') do set VIBE_PY_VER=%%v
+echo  OK - Python !VIBE_PY_VER!
+
+REM ·· Inizializza submodule vibe-trading ──────────────────────────────────────
+echo  [*] Inizializzazione submodule vibe-trading...
+cd /d "%HV_DIR%"
+git submodule update --init vibe-trading
+if %errorlevel% neq 0 (
+    echo  Submodule non trovato, clono direttamente...
+    git clone https://github.com/HKUDS/Vibe-Trading.git "%HV_DIR%\vibe-trading"
+    if %errorlevel% neq 0 ( echo  ERRORE: Clone Vibe-Trading fallito. Salto. & goto STEP5 )
+)
+echo  OK - Vibe-Trading presente in: %HV_DIR%\vibe-trading
+
+set VIBE_AGENT_DIR=%HV_DIR%\vibe-trading\agent
+if not exist "!VIBE_AGENT_DIR!\api_server.py" (
+    echo  ERRORE: api_server.py non trovato in !VIBE_AGENT_DIR!
+    goto STEP5
+)
+
+REM ·· Installa dipendenze Python ──────────────────────────────────────────────
+echo  [*] Installazione dipendenze Python Vibe-Trading...
+!VIBE_PYEXE! -m pip install vibe-trading-ai fastapi uvicorn --user --quiet --no-warn-script-location
+if %errorlevel% neq 0 (
+    echo  Provo con requirements.txt...
+    !VIBE_PYEXE! -m pip install -r "!VIBE_AGENT_DIR!\requirements.txt" --user --quiet --no-warn-script-location
+    if !errorlevel! neq 0 ( echo  ERRORE: pip install fallito. Continuo senza Vibe-Trading. & goto STEP5 )
+)
+echo  OK - Dipendenze Python installate
+
+REM ·· Crea cartella tools\vibe-trading e verifica vibe-bridge.js ──────────────
+mkdir "%VIBE_TOOLS_DIR%" >nul 2>&1
+if not exist "%VIBE_TOOLS_DIR%\vibe-bridge.js" (
+    echo  ATTENZIONE: vibe-bridge.js non trovato in %VIBE_TOOLS_DIR%
+    echo  Scaricalo dalla sessione di installazione e copialo in:
+    echo    %VIBE_TOOLS_DIR%\vibe-bridge.js
+) else (
+    echo  OK - vibe-bridge.js presente
+)
+
+REM ·· Configura provider LLM per Vibe-Trading ─────────────────────────────────
+echo.
+echo  Provider LLM per Vibe-Trading (indipendente da HyperVibe):
+echo.
+echo   [1] Ollama locale    - gratis, usa stesso Ollama di HyperVibe
+echo   [2] DeepSeek API     - economico ($0.001/1K token), qualita' alta
+echo   [3] OpenRouter       - gateway multi-modello
+echo   [4] Anthropic        - usa stessa key di HyperVibe
+echo.
+set VIBE_LLM=
+set /p VIBE_LLM="  Scelta [1/2/3/4]: "
+
+set VIBE_ENV_CONTENT=
+if "!VIBE_LLM!"=="1" (
+    set VIBE_PROVIDER=ollama
+    if not "!OLLAMA_MODEL!"=="" (
+        set VIBE_MODEL=!OLLAMA_MODEL!
+    ) else (
+        set VIBE_MODEL=qwen2.5:7b
+    )
+    set VIBE_ENV_CONTENT=LANGCHAIN_PROVIDER=ollama
+    set VIBE_ENV_CONTENT=!VIBE_ENV_CONTENT!^
+LANGCHAIN_MODEL_NAME=!VIBE_MODEL!
+    set VIBE_ENV_CONTENT=!VIBE_ENV_CONTENT!^
+OLLAMA_BASE_URL=http://localhost:11434/v1
+)
+if "!VIBE_LLM!"=="2" (
+    set VIBE_PROVIDER=deepseek
+    set /p VIBE_DS_KEY="  DeepSeek API Key (sk-...): "
+    set VIBE_ENV_CONTENT=LANGCHAIN_PROVIDER=deepseek
+    set VIBE_ENV_CONTENT=!VIBE_ENV_CONTENT!^
+LANGCHAIN_MODEL_NAME=deepseek-chat
+    set VIBE_ENV_CONTENT=!VIBE_ENV_CONTENT!^
+DEEPSEEK_API_KEY=!VIBE_DS_KEY!
+    set VIBE_ENV_CONTENT=!VIBE_ENV_CONTENT!^
+DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
+)
+if "!VIBE_LLM!"=="3" (
+    set VIBE_PROVIDER=openrouter
+    set /p VIBE_OR_KEY="  OpenRouter API Key (sk-or-...): "
+    set /p VIBE_OR_MODEL="  Modello (es. deepseek/deepseek-v3.2): "
+    if "!VIBE_OR_MODEL!"=="" set VIBE_OR_MODEL=deepseek/deepseek-v3.2
+    set VIBE_ENV_CONTENT=LANGCHAIN_PROVIDER=openrouter
+    set VIBE_ENV_CONTENT=!VIBE_ENV_CONTENT!^
+LANGCHAIN_MODEL_NAME=!VIBE_OR_MODEL!
+    set VIBE_ENV_CONTENT=!VIBE_ENV_CONTENT!^
+OPENROUTER_API_KEY=!VIBE_OR_KEY!
+    set VIBE_ENV_CONTENT=!VIBE_ENV_CONTENT!^
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+)
+if "!VIBE_LLM!"=="4" (
+    set VIBE_PROVIDER=anthropic-compat
+    set VIBE_ENV_CONTENT=LANGCHAIN_PROVIDER=openai
+    set VIBE_ENV_CONTENT=!VIBE_ENV_CONTENT!^
+LANGCHAIN_MODEL_NAME=claude-haiku-4-5-20251001
+    set VIBE_ENV_CONTENT=!VIBE_ENV_CONTENT!^
+OPENAI_API_KEY=!FINAL_A!
+    set VIBE_ENV_CONTENT=!VIBE_ENV_CONTENT!^
+OPENAI_BASE_URL=https://api.anthropic.com/v1
+)
+
+REM ·· Scrivi .env di Vibe-Trading ─────────────────────────────────────────────
+set VIBE_ENV_FILE=!VIBE_AGENT_DIR!\.env
+(
+    echo LANGCHAIN_TEMPERATURE=0.0
+    echo TIMEOUT_SECONDS=180
+    echo MAX_RETRIES=2
+) >> "!VIBE_ENV_FILE!" 2>nul
+
+REM Scrivi le righe provider riga per riga
+if "!VIBE_LLM!"=="1" (
+    (
+        echo LANGCHAIN_PROVIDER=ollama
+        echo LANGCHAIN_MODEL_NAME=!VIBE_MODEL!
+        echo OLLAMA_BASE_URL=http://localhost:11434/v1
+        echo LANGCHAIN_TEMPERATURE=0.0
+        echo TIMEOUT_SECONDS=180
+        echo MAX_RETRIES=2
+    ) > "!VIBE_ENV_FILE!"
+)
+if "!VIBE_LLM!"=="2" (
+    (
+        echo LANGCHAIN_PROVIDER=deepseek
+        echo LANGCHAIN_MODEL_NAME=deepseek-chat
+        echo DEEPSEEK_API_KEY=!VIBE_DS_KEY!
+        echo DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
+        echo LANGCHAIN_TEMPERATURE=0.0
+        echo TIMEOUT_SECONDS=180
+        echo MAX_RETRIES=2
+    ) > "!VIBE_ENV_FILE!"
+)
+if "!VIBE_LLM!"=="3" (
+    (
+        echo LANGCHAIN_PROVIDER=openrouter
+        echo LANGCHAIN_MODEL_NAME=!VIBE_OR_MODEL!
+        echo OPENROUTER_API_KEY=!VIBE_OR_KEY!
+        echo OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+        echo LANGCHAIN_TEMPERATURE=0.0
+        echo TIMEOUT_SECONDS=180
+        echo MAX_RETRIES=2
+    ) > "!VIBE_ENV_FILE!"
+)
+if "!VIBE_LLM!"=="4" (
+    (
+        echo LANGCHAIN_PROVIDER=openai
+        echo LANGCHAIN_MODEL_NAME=claude-haiku-4-5-20251001
+        echo OPENAI_API_KEY=!FINAL_A!
+        echo OPENAI_BASE_URL=https://api.anthropic.com/v1
+        echo LANGCHAIN_TEMPERATURE=0.0
+        echo TIMEOUT_SECONDS=180
+        echo MAX_RETRIES=2
+    ) > "!VIBE_ENV_FILE!"
+)
+
+echo  OK - .env Vibe-Trading salvato in: !VIBE_ENV_FILE!
+echo.
+set INSTALL_VIBE_OK=1
+set VIBE_DIR_FINAL=!VIBE_AGENT_DIR!
+echo  OK - Vibe-Trading installato
 
 REM ── Step 5: Scelta motore AI ─────────────────────────────────────────────────
 :STEP5
@@ -389,17 +590,14 @@ if not defined CLANGCL_EXE (
     if not defined CLANGCL_EXE (
         echo.
         echo  ERRORE: clang-cl.exe non trovato dopo installazione.
-        echo  Apri VS Installer manualmente:
-        echo    Modifica - Componenti singoli - cerca Clang
-        echo    - spunta C++ Clang tools for Windows - Modifica
-        echo  Poi riesegui questo installer.
+        echo  Apri VS Installer manualmente, Modifica - Componenti singoli - cerca Clang.
         pause
         goto STEP5
     )
 )
 echo  OK - clang-cl trovato: !CLANGCL_EXE!
 
-REM ·· LLVM standalone (opzionale, non blocca la build) ───────────────────────
+REM ·· LLVM standalone ─────────────────────────────────────────────────────────
 echo  [*] Verifica LLVM/clang nel PATH...
 set "LLVM_BIN="
 clang --version >nul 2>&1
@@ -411,12 +609,9 @@ if defined LLVM_BIN ( set "PATH=!LLVM_BIN!;!PATH!" & echo  OK - LLVM: !LLVM_BIN!
 echo  LLVM standalone non trovato (non bloccante)
 :LLVM_DONE
 
-REM ·· Python 3.11 obbligatorio ────────────────────────────────────────────────
+REM ·· Python 3.11 per BitNet ──────────────────────────────────────────────────
 echo  [*] Verifica Python 3.11 per BitNet...
-echo      torch 2.2.1 richiesto da BitNet non supporta Python 3.12+
-echo.
 set "PYEXE="
-
 py -3.11 --version >nul 2>&1
 if %errorlevel% equ 0 ( set "PYEXE=py -3.11" & goto PYTHON_BITNET_OK )
 python3.11 --version >nul 2>&1
@@ -426,12 +621,10 @@ if exist "%LOCALAPPDATA%\Programs\Python\Python311\python.exe" (
     set "PYEXE=%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
     goto PYTHON_BITNET_OK
 )
-
-echo  Python 3.11 non trovato. Installazione in corso...
+echo  Python 3.11 non trovato. Installazione...
 winget install --id Python.Python.3.11 --silent --accept-package-agreements --accept-source-agreements
 set "PATH=%LOCALAPPDATA%\Programs\Python\Python311;%LOCALAPPDATA%\Programs\Python\Python311\Scripts;%PATH%"
 ping -n 3 127.0.0.1 >nul 2>&1
-
 py -3.11 --version >nul 2>&1
 if %errorlevel% equ 0 ( set "PYEXE=py -3.11" & goto PYTHON_BITNET_OK )
 if exist "%LOCALAPPDATA%\Programs\Python\Python311\python.exe" (
@@ -445,52 +638,32 @@ goto STEP5
 :PYTHON_BITNET_OK
 for /f "tokens=2" %%v in ('!PYEXE! --version 2^>^&1') do set PY_BITNET_VER=%%v
 echo  OK - Python !PY_BITNET_VER!
-
 !PYEXE! -c "import sys; sys.exit(0 if sys.version_info[:2]==(3,11) else 1)" >nul 2>&1
 if %errorlevel% neq 0 (
     echo  ERRORE: Python trovato ma non e' la versione 3.11.
-    echo  Installa Python 3.11: https://www.python.org/downloads/release/python-3119/
     pause
     goto STEP5
 )
 
-REM ·· pip + huggingface-hub ───────────────────────────────────────────────────
-echo  [*] Aggiornamento pip Python 3.11...
 !PYEXE! -m ensurepip --upgrade >nul 2>&1
 !PYEXE! -m pip install --upgrade pip setuptools wheel --user --quiet --no-warn-script-location
-if %errorlevel% neq 0 ( echo  ERRORE: aggiornamento pip fallito. & pause & goto STEP5 )
-
-echo  [*] Installazione huggingface-hub...
 !PYEXE! -m pip install "huggingface_hub>=0.34.0,<1.0" --user --quiet --no-warn-script-location
 if %errorlevel% neq 0 ( echo  ERRORE: pip install huggingface_hub fallito. & pause & goto STEP5 )
 echo  OK - huggingface-hub pronto
 
-REM ·· Clone microsoft/BitNet ──────────────────────────────────────────────────
-echo  [*] Verifica BitNet repo...
 if not exist "%BITNET_DIR%\setup_env.py" (
-    echo  Clone microsoft/BitNet con submoduli, circa 500MB...
+    echo  Clone microsoft/BitNet...
     git clone --recursive https://github.com/microsoft/BitNet.git "%BITNET_DIR%"
     if %errorlevel% neq 0 ( echo  ERRORE: Clone BitNet fallito. & pause & goto STEP5 )
-    echo  OK - BitNet clonato
 ) else (
-    echo  OK - BitNet gia' presente, aggiorno...
     git -C "%BITNET_DIR%" pull >nul 2>&1
 )
 
-REM ·· Submoduli sempre aggiornati ─────────────────────────────────────────────
-echo  [*] Inizializzazione submoduli BitNet (llama.cpp / gguf-py)...
 git -C "%BITNET_DIR%" submodule update --init --recursive
 if %errorlevel% neq 0 ( echo  ERRORE: submodule update fallito. & pause & goto STEP5 )
-echo  OK - Submoduli pronti
 
-REM ·· FIX v3.10: pulizia cache build stale ────────────────────────────────────
-if exist "%BITNET_DIR%\build" (
-    echo  [*] Pulizia cache build precedente...
-    rmdir /s /q "%BITNET_DIR%\build" >nul 2>&1
-    echo  OK - Cache build rimossa
-)
+if exist "%BITNET_DIR%\build" rmdir /s /q "%BITNET_DIR%\build" >nul 2>&1
 
-REM ·· Build in Developer shell via bat temporaneo ─────────────────────────────
 set BITNET_BUILD_BAT=%TMP_DIR%\bitnet_build.bat
 (
     echo @echo off
@@ -504,29 +677,17 @@ set BITNET_BUILD_BAT=%TMP_DIR%\bitnet_build.bat
 ) > "%BITNET_BUILD_BAT%"
 
 echo.
-echo  [*] Build BitNet + download modello, circa 1.2GB...
-echo      Questa fase richiede 5-15 minuti. Attendi.
-echo.
+echo  [*] Build BitNet + download modello (~1.2GB, 5-15 minuti)...
 call "%BITNET_BUILD_BAT%"
 if %errorlevel% neq 0 (
-    echo.
-    echo  ERRORE: Build BitNet fallita.
-    echo  Controlla il log: !BITNET_DIR!\logs\generate_build_files.log
-    echo.
-    echo  Verifica che "C++ Clang tools for Windows" sia installato in VS:
-    echo    VS Installer - Modifica - Componenti singoli - cerca Clang
-    echo.
-    echo  Prova manualmente dal Developer Command Prompt for VS:
-    echo    cd !BITNET_DIR!
-    echo    !PYEXE! setup_env.py -md models/BitNet-b1.58-2B-4T -q i2_s
-    echo.
+    echo  ERRORE: Build BitNet fallita. Controlla: !BITNET_DIR!\logs\
     pause
     goto STEP5
 )
 del "%BITNET_BUILD_BAT%" >nul 2>&1
 
 if not exist "%BITNET_DIR%\models\BitNet-b1.58-2B-4T\ggml-model-i2_s.gguf" (
-    echo  ERRORE: .gguf non trovato dopo la build. Build incompleta.
+    echo  ERRORE: .gguf non trovato. Build incompleta.
     pause
     goto STEP5
 )
@@ -767,6 +928,10 @@ if "!INSTALL_AUTOTRADE_OK!"=="1" (
     echo AUTOTRADE_DIR=!TOOLS_DIR!\autotrade>>"%ENV_FILE%"
     echo SIGNALS_DIR=!APP_DIR!\playbooks\signals>>"%ENV_FILE%"
 )
+if "!INSTALL_VIBE_OK!"=="1" (
+    echo VIBE_TRADING_DIR=!VIBE_DIR_FINAL!>>"%ENV_FILE%"
+    echo VIBE_TRADING_URL=http://localhost:8000>>"%ENV_FILE%"
+)
 
 if /i "!PROVIDER!" neq "trihybrid" goto WRITE_DONE
 
@@ -819,6 +984,10 @@ if /i "!PROVIDER!"=="trihybrid" (
 )
 echo   Network   : !FINAL_NET!
 if "!INSTALL_AUTOTRADE_OK!"=="1" echo   Autotrade : INSTALLATO
+if "!INSTALL_VIBE_OK!"=="1" (
+    echo   Vibe-Trading : INSTALLATO ^(!VIBE_PROVIDER!^)
+    echo   Swarm        : crypto_trading_desk, risk_committee
+)
 echo  ==========================================
 echo.
 
