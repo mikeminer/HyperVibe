@@ -1,6 +1,6 @@
 @echo off
 setlocal EnableDelayedExpansion
-title HyperVibe Installer v3.12
+title HyperVibe Installer v3.13
 chcp 437 >nul
 
 set INSTALL_DIR=%~dp0
@@ -9,7 +9,7 @@ set TMP_DIR=%TEMP%\hypervibe_install
 
 echo.
 echo  ==========================================
-echo   HYPERVIBE - Installer v3.12
+echo   HYPERVIBE - Installer v3.13
 echo   Cartella: %INSTALL_DIR%
 echo  ==========================================
 echo.
@@ -446,6 +446,8 @@ echo   [22] Qwen3 72B             - qwen3:72b             ~48GB
 echo.
 echo   [23] Nome custom
 echo.
+echo   [24] Raccomandami tu (llmfit) - analisi automatica del tuo hardware
+echo.
 set LOCAL_CHOICE=
 :ASK_LOCAL
 set /p LOCAL_CHOICE="  Modello [1-23]: "
@@ -472,7 +474,176 @@ if "!LOCAL_CHOICE!"=="20" ( set OLLAMA_MODEL=mixtral:8x7b          & set FORCE_U
 if "!LOCAL_CHOICE!"=="21" ( set OLLAMA_MODEL=llama3.1:70b          & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
 if "!LOCAL_CHOICE!"=="22" ( set OLLAMA_MODEL=qwen3:72b             & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
 if "!LOCAL_CHOICE!"=="23" ( set /p OLLAMA_MODEL="  Tag Ollama: " & set FORCE_UPDATE_OLLAMA=0 & goto LOCAL_OK )
+if "!LOCAL_CHOICE!"=="24" goto AI_LLMFIT_RECOMMEND
 goto ASK_LOCAL
+
+
+REM ── llmfit: raccomandazione automatica basata sull'hardware ─────────────────
+:AI_LLMFIT_RECOMMEND
+echo.
+echo  ========================================================
+echo   LLMFIT - Analisi automatica hardware in corso...
+echo  ========================================================
+echo.
+
+REM Verifica se llmfit e' gia' disponibile
+llmfit --version >nul 2>&1
+if %errorlevel% equ 0 goto LLMFIT_RUN
+
+REM Prova installazione via Scoop (metodo preferito su Windows)
+scoop --version >nul 2>&1
+if %errorlevel% equ 0 (
+    echo  [*] Installazione llmfit via Scoop...
+    scoop install llmfit
+    llmfit --version >nul 2>&1
+    if %errorlevel% equ 0 goto LLMFIT_RUN
+)
+
+REM Fallback: download diretto del binario da GitHub Releases
+echo  [*] Scoop non trovato. Download binario llmfit...
+set LLMFIT_URL=https://github.com/AlexsJones/llmfit/releases/latest/download/llmfit-x86_64-pc-windows-msvc.zip
+set LLMFIT_ZIP=%TMP_DIR%\llmfit.zip
+set LLMFIT_BIN=%TMP_DIR%\llmfit.exe
+
+curl -L --progress-bar -o "%LLMFIT_ZIP%" "%LLMFIT_URL%"
+if %errorlevel% neq 0 (
+    echo  ERRORE: Download llmfit fallito. Continuo con selezione manuale.
+    goto AI_LOCAL_MENU
+)
+
+powershell -Command "Expand-Archive -Path '%LLMFIT_ZIP%' -DestinationPath '%TMP_DIR%\llmfit_extracted' -Force" >nul 2>&1
+for /f "delims=" %%F in ('dir /b /s "%TMP_DIR%\llmfit_extracted\*.exe" 2^>nul') do set LLMFIT_BIN=%%F
+if not exist "!LLMFIT_BIN!" (
+    echo  ERRORE: Binario llmfit non trovato nell'archivio. Continuo con selezione manuale.
+    goto AI_LOCAL_MENU
+)
+set "PATH=!TMP_DIR!\llmfit_extracted;!PATH!"
+
+REM Verifica finale
+llmfit --version >nul 2>&1
+if %errorlevel% neq 0 (
+    echo  ERRORE: llmfit non eseguibile. Continuo con selezione manuale.
+    goto AI_LOCAL_MENU
+)
+
+:LLMFIT_RUN
+echo  [*] Analisi hardware e raccomandazione modelli in corso...
+echo      (richiede pochi secondi)
+echo.
+
+REM Esegui llmfit e salva JSON
+set LLMFIT_OUT=%TMP_DIR%\llmfit_rec.json
+llmfit recommend --use-case general -n 3 > "%LLMFIT_OUT%" 2>nul
+if %errorlevel% neq 0 (
+    echo  ERRORE: llmfit recommend fallito. Continuo con selezione manuale.
+    goto AI_LOCAL_MENU
+)
+
+REM Parsing JSON e mapping a tag Ollama via PowerShell
+set LLMFIT_PS=%TMP_DIR%\llmfit_parse.ps1
+(
+    echo $json = Get-Content '%LLMFIT_OUT%' -Raw ^| ConvertFrom-Json
+    echo $models = $json.models
+    echo if ^(-not $models -or $models.Count -eq 0^) { Write-Output 'NOMODEL'; exit }
+    echo.
+    echo function Map-ToOllama($name) {
+    echo     $n = $name.ToLower()
+    echo     if ($n -match 'qwen2\.5-coder.*?(\d+)b') { return "qwen2.5-coder:$($Matches[1])b" }
+    echo     if ($n -match 'qwen2\.5.*?(\d+\.?\d*)b') { $s=$Matches[1]; return "qwen2.5:${s}b" }
+    echo     if ($n -match 'qwen3.*?(\d+)b') { return "qwen3:$($Matches[1])b" }
+    echo     if ($n -match 'llama.?3\.3.*?(\d+)b') { return "llama3.3:$($Matches[1])b" }
+    echo     if ($n -match 'llama.?3\.2.*?(\d+)b') { return "llama3.2:$($Matches[1])b" }
+    echo     if ($n -match 'llama.?3\.1.*?(\d+)b') { return "llama3.1:$($Matches[1])b" }
+    echo     if ($n -match 'gemma.?4.*?(\d+)b') { return "gemma4:$($Matches[1])b" }
+    echo     if ($n -match 'gemma.?3.*?(\d+)b') { return "gemma3:$($Matches[1])b" }
+    echo     if ($n -match 'phi.?4.?mini') { return "phi4-mini" }
+    echo     if ($n -match 'phi.?4.*?(\d+)b') { return "phi4:$($Matches[1])b" }
+    echo     if ($n -match 'mistral.?nemo') { return "mistral-nemo" }
+    echo     if ($n -match 'mistral.*?7b') { return "mistral:7b" }
+    echo     if ($n -match 'granite.*?8b') { return "granite3.2:8b" }
+    echo     return $null
+    echo }
+    echo.
+    echo $best = $null
+    echo $bestTag = $null
+    echo foreach ($m in $models) {
+    echo     $tag = Map-ToOllama $m.name
+    echo     if ($tag -and -not $bestTag) {
+    echo         $best = $m
+    echo         $bestTag = $tag
+    echo     }
+    echo }
+    echo.
+    echo if (-not $bestTag) {
+    echo     # Fallback: usa il top modello anche senza mapping esatto
+    echo     $best = $models[0]
+    echo     $bestTag = 'NOMATCH'
+    echo }
+    echo.
+    echo $score = [math]::Round($best.score, 1)
+    echo $tps   = [math]::Round($best.estimated_tps, 1)
+    echo $ram   = [math]::Round($best.memory_required_gb, 1)
+    echo $fit   = $best.fit_level
+    echo $quant = $best.best_quant
+    echo Write-Output "$bestTag|$($best.name)|$score|$tps|$ram|$fit|$quant"
+) > "%LLMFIT_PS%"
+
+set LLMFIT_RESULT=
+for /f "delims=" %%R in ('powershell -NoProfile -ExecutionPolicy Bypass -File "%LLMFIT_PS%" 2^>nul') do set LLMFIT_RESULT=%%R
+
+if "!LLMFIT_RESULT!"=="NOMODEL" (
+    echo  Nessun modello compatibile trovato. Continuo con selezione manuale.
+    goto AI_LOCAL_MENU
+)
+if "!LLMFIT_RESULT!"=="" (
+    echo  ERRORE: parsing llmfit fallito. Continuo con selezione manuale.
+    goto AI_LOCAL_MENU
+)
+
+REM Estrai i campi dal risultato pipe-delimitato
+for /f "tokens=1,2,3,4,5,6,7 delims=|" %%A in ("!LLMFIT_RESULT!") do (
+    set LLMFIT_TAG=%%A
+    set LLMFIT_NAME=%%B
+    set LLMFIT_SCORE=%%C
+    set LLMFIT_TPS=%%D
+    set LLMFIT_RAM=%%E
+    set LLMFIT_FIT=%%F
+    set LLMFIT_QUANT=%%G
+)
+
+REM Mostra raccomandazione
+echo  ========================================================
+echo   RACCOMANDAZIONE LLMFIT
+echo  ========================================================
+echo.
+echo   Modello      : !LLMFIT_NAME!
+if not "!LLMFIT_TAG!"=="NOMATCH" (
+    echo   Ollama tag   : !LLMFIT_TAG!
+)
+echo   Score        : !LLMFIT_SCORE!/100
+echo   Stima tok/s  : ~!LLMFIT_TPS! t/s
+echo   RAM richiesta: !LLMFIT_RAM! GB
+echo   Fit          : !LLMFIT_FIT!
+echo   Quantiz.     : !LLMFIT_QUANT!
+echo.
+
+if "!LLMFIT_TAG!"=="NOMATCH" (
+    echo  ATTENZIONE: modello "!LLMFIT_NAME!" non ha un tag Ollama mappato.
+    echo  Puoi inserire manualmente il tag corretto oppure tornare al menu.
+    echo.
+    set /p CUSTOM_TAG="  Tag Ollama da usare (o INVIO per menu manuale): "
+    if "!CUSTOM_TAG!"=="" goto AI_LOCAL_MENU
+    set OLLAMA_MODEL=!CUSTOM_TAG!
+    set FORCE_UPDATE_OLLAMA=0
+    goto LOCAL_OK
+)
+
+set /p LLMFIT_CONFIRM="  Usare !LLMFIT_TAG! come consigliato? (S/N - N per menu manuale): "
+if /i "!LLMFIT_CONFIRM!"=="N" goto AI_LOCAL_MENU
+
+set OLLAMA_MODEL=!LLMFIT_TAG!
+set FORCE_UPDATE_OLLAMA=0
+echo  OK - Selezionato: !OLLAMA_MODEL! (raccomandato da llmfit, score !LLMFIT_SCORE!)
 
 :LOCAL_OK
 set PROVIDER=ollama
