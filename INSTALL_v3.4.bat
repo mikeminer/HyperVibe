@@ -656,30 +656,60 @@ echo      Quantizzazione: !LLMFIT_QUANT!
 echo      Questa operazione puo' richiedere diversi minuti.
 echo.
 
-REM Usa huggingface-cli (disponibile se Python installato)
 set LLAMACPP_MODEL_FILE=
 python --version >nul 2>&1
-if %errorlevel% equ 0 (
-    python -m pip install huggingface-hub --user --quiet --no-warn-script-location >nul 2>&1
-    for /f "delims=" %%F in ('python -c "from huggingface_hub import snapshot_download; import os; path=snapshot_download(repo_id='!LLMFIT_GGUF_REPO!', allow_patterns=['*!LLMFIT_QUANT!*.gguf'], local_dir='!LLAMACPP_MODELS!'); files=[f for f in os.listdir(path) if f.endswith('.gguf')]; print(os.path.join(path,files[0])) if files else print('')" 2^>nul') do set LLAMACPP_MODEL_FILE=%%F
+if %errorlevel% neq 0 (
+    echo  ERRORE: Python non trovato. Installa Python da https://python.org
+    goto LLAMACPP_ASK_MANUAL
 )
 
-if "!LLAMACPP_MODEL_FILE!"=="" (
-    echo  ATTENZIONE: download automatico fallito.
-    set /p LLAMACPP_MODEL_FILE="  Inserisci il path completo al file .gguf (o INVIO per menu manuale): "
-    if "!LLAMACPP_MODEL_FILE!"=="" goto AI_LOCAL_MENU
+echo  [*] Installo huggingface-hub se mancante...
+python -m pip install huggingface-hub --user --quiet --no-warn-script-location >nul 2>&1
+
+echo  [*] Download in corso (puo richiedere 5-30 minuti)...
+python -m huggingface_hub.commands.huggingface_cli download "!LLMFIT_GGUF_REPO!" --include "*!LLMFIT_QUANT!*.gguf" --local-dir "!LLAMACPP_MODELS!" 2>nul
+if %errorlevel% neq 0 (
+    echo  Provo senza filtro quantizzazione...
+    python -m huggingface_hub.commands.huggingface_cli download "!LLMFIT_GGUF_REPO!" --include "*.gguf" --local-dir "!LLAMACPP_MODELS!" 2>nul
 )
+
+REM Trova il file .gguf con PowerShell (cerca prima quant specifico)
+set LLAMACPP_FIND_PS=%TMP_DIR%\find_gguf.ps1
+if exist "%LLAMACPP_FIND_PS%" del "%LLAMACPP_FIND_PS%"
+>>"%LLAMACPP_FIND_PS%" echo $dir = $env:LLAMACPP_MODELS
+>>"%LLAMACPP_FIND_PS%" echo $quant = $env:LLMFIT_QUANT
+>>"%LLAMACPP_FIND_PS%" echo $files = Get-ChildItem $dir -Recurse -Filter ^"*.gguf^" ^| Sort-Object Length -Descending
+>>"%LLAMACPP_FIND_PS%" echo $best = $files ^| Where-Object { $_.Name -like ^"*$quant*^" } ^| Select-Object -First 1
+>>"%LLAMACPP_FIND_PS%" echo if (-not $best) { $best = $files ^| Select-Object -First 1 }
+>>"%LLAMACPP_FIND_PS%" echo if ($best) { Write-Output $best.FullName } else { Write-Output ^"^" }
+
+for /f "delims=" %%F in ('powershell -NoProfile -ExecutionPolicy Bypass -File "%LLAMACPP_FIND_PS%" 2^>nul') do set LLAMACPP_MODEL_FILE=%%F
+
+if "!LLAMACPP_MODEL_FILE!"=="" goto LLAMACPP_ASK_MANUAL
+echo  OK - Modello trovato: !LLAMACPP_MODEL_FILE!
+goto LLAMACPP_CONFIGURE
+
+:LLAMACPP_ASK_MANUAL
+echo.
+echo  Download automatico non riuscito.
+echo  Scarica manualmente da:
+echo    https://huggingface.co/!LLMFIT_GGUF_REPO!
+echo  Scegli il file con quantizzazione !LLMFIT_QUANT! (.gguf)
+echo.
+set /p LLAMACPP_MODEL_FILE="  Path completo al .gguf (INVIO per menu manuale): "
+if "!LLAMACPP_MODEL_FILE!"=="" goto AI_LOCAL_MENU
+
+:LLAMACPP_CONFIGURE
 echo  OK - Modello: !LLAMACPP_MODEL_FILE!
 
 REM Crea script di avvio llama.cpp
 set LLAMACPP_START=%HV_DIR%\StartLlamaCppServer.bat
-(
-    echo @echo off
-    echo title llama.cpp Server - HyperVibe
-    echo echo Avvio llama.cpp server su porta %LLAMACPP_PORT%...
-    echo "!LLAMACPP_DIR!\llama-server.exe" -m "!LLAMACPP_MODEL_FILE!" --port %LLAMACPP_PORT% --host 127.0.0.1 -c 4096 -np 1
-    echo pause
-) > "%LLAMACPP_START%"
+if exist "%LLAMACPP_START%" del "%LLAMACPP_START%"
+>>"%LLAMACPP_START%" echo @echo off
+>>"%LLAMACPP_START%" echo title llama.cpp Server - HyperVibe
+>>"%LLAMACPP_START%" echo echo Avvio llama.cpp server su porta %LLAMACPP_PORT%...
+>>"%LLAMACPP_START%" echo "!LLAMACPP_DIR!\llama-server.exe" -m "!LLAMACPP_MODEL_FILE!" --port %LLAMACPP_PORT% --host 127.0.0.1 -c 4096 -np 1
+>>"%LLAMACPP_START%" echo pause
 echo  OK - Script avvio: %LLAMACPP_START%
 
 REM Configura HyperVibe per usare llama.cpp come backend
