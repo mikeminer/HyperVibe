@@ -1,10 +1,12 @@
 /**
  * llm-provider.js — Unified LLM adapter per HyperVibe
  *
- * PROVIDER=ollama     → Ollama locale, modello da OLLAMA_MODEL
- * PROVIDER=anthropic  → Anthropic API, richiede ANTHROPIC_API_KEY
- * PROVIDER=trihybrid  → Tri-Hybrid Engine bridge su :3002
- *                       (routing automatico LLaMA → GPT → Claude)
+ * PROVIDER=ollama      → Ollama locale, modello da OLLAMA_MODEL (gratis)
+ * PROVIDER=anthropic   → Anthropic API, richiede ANTHROPIC_API_KEY (a pagamento)
+ * PROVIDER=trihybrid   → Tri-Hybrid Engine bridge su :3002
+ * PROVIDER=smart       → 🧠 Smart routing: Ollama first → Anthropic fallback
+ *                        Usa Anthropic SOLO se Ollama fallisce o produce
+ *                        una risposta senza tool_use quando i tool erano attesi.
  *
  * Output sempre in formato Anthropic:
  *   { content: [ {type:'text'|'tool_use', ...} ], stop_reason: '...' }
@@ -14,9 +16,49 @@
 
 const PROVIDER        = (process.env.PROVIDER || 'ollama').toLowerCase();
 const OLLAMA_BASE     = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
-const OLLAMA_MODEL    = process.env.OLLAMA_MODEL || 'qwen2.5:14b';
-const ANTHROPIC_MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-4-20250514';
-const THY_BRIDGE_URL  = process.env.THY_BRIDGE_URL || 'http://127.0.0.1:3002';
+const OLLAMA_MODEL    = process.env.OLLAMA_MODEL    || 'qwen2.5:7b';
+const ANTHROPIC_MODEL = process.env.CLAUDE_MODEL    || 'claude-sonnet-4-20250514';
+const THY_BRIDGE_URL  = process.env.THY_BRIDGE_URL  || 'http://127.0.0.1:3002';
+
+// ─── Cost tracker ─────────────────────────────────────────────────────────────
+// Prezzi approssimativi per token (input+output medi)
+const COST_PER_TOKEN = {
+  'claude-sonnet-4-20250514': 0.000003,
+  'claude-opus-4-20250514':   0.000015,
+  'claude-haiku-4-5-20251001':0.0000008,
+  ollama:                     0,
+  trihybrid:                  0,
+};
+
+const sessionStats = {
+  calls:   { ollama: 0, anthropic: 0, trihybrid: 0, smart_local: 0, smart_escalated: 0 },
+  tokens:  { ollama: 0, anthropic: 0 },
+  costUSD: 0,
+};
+
+function trackCall(provider, tokensEstimate = 1000) {
+  if (provider === 'ollama' || provider === 'smart_local') {
+    sessionStats.calls.ollama++;
+    sessionStats.tokens.ollama += tokensEstimate;
+    if (provider === 'smart_local') sessionStats.calls.smart_local++;
+  } else if (provider === 'anthropic' || provider === 'smart_escalated') {
+    sessionStats.calls.anthropic++;
+    sessionStats.tokens.anthropic += tokensEstimate;
+    const cost = tokensEstimate * (COST_PER_TOKEN[ANTHROPIC_MODEL] || 0.000003);
+    sessionStats.costUSD += cost;
+    if (provider === 'smart_escalated') sessionStats.calls.smart_escalated++;
+    console.warn(`[💸 API] Anthropic call — ~${tokensEstimate} tokens | costo stimato: $${cost.toFixed(5)} | totale sessione: $${sessionStats.costUSD.toFixed(4)}`);
+  } else if (provider === 'trihybrid') {
+    sessionStats.calls.trihybrid++;
+  }
+}
+
+export function getSessionStats() {
+  return {
+    ...sessionStats,
+    summary: `Ollama: ${sessionStats.calls.ollama} calls (free) | Anthropic: ${sessionStats.calls.anthropic} calls ($${sessionStats.costUSD.toFixed(4)}) | Smart escalations: ${sessionStats.calls.smart_escalated}`,
+  };
+}
 
 // ─── Anthropic ────────────────────────────────────────────────────────────────
 
@@ -48,8 +90,8 @@ async function trihybridCreate({ max_tokens, system, messages, tools }) {
     resp = await fetch(`${THY_BRIDGE_URL}/v1/messages`, {
       method:  'POST',
       headers: {
-        'Content-Type':  'application/json',
-        'x-api-key':     process.env.ANTHROPIC_API_KEY || 'tri-hybrid',
+        'Content-Type':      'application/json',
+        'x-api-key':         process.env.ANTHROPIC_API_KEY || 'tri-hybrid',
         'anthropic-version': '2023-06-01',
       },
       body:   JSON.stringify(body),
@@ -67,7 +109,6 @@ async function trihybridCreate({ max_tokens, system, messages, tools }) {
     throw new Error(`[Tri-Hybrid] HTTP ${resp.status}: ${text}`);
   }
 
-  // La risposta è già in formato Anthropic — la restituiamo direttamente
   return await resp.json();
 }
 
@@ -139,7 +180,7 @@ function toOllamaMessages(system, messages) {
   return out;
 }
 
-// ─── Response: OpenAI format → Anthropic format ───────────────────────────────
+// ─── Ollama — response converter ──────────────────────────────────────────────
 
 function fromOllamaResponse(ollamaResp) {
   const choice  = ollamaResp.choices?.[0];
@@ -213,6 +254,79 @@ async function ollamaCreate({ max_tokens, system, messages, tools }) {
   return fromOllamaResponse(await resp.json());
 }
 
+// ─── Ollama health check ──────────────────────────────────────────────────────
+
+async function isOllamaAvailable() {
+  try {
+    const resp = await fetch(`${OLLAMA_BASE}/api/tags`, {
+      signal: AbortSignal.timeout(3000)
+    });
+    return resp.ok;
+  } catch {
+    return false;
+  }
+}
+
+// ─── Smart routing ────────────────────────────────────────────────────────────
+//
+// Logica:
+//   1. Prova sempre Ollama prima (gratis)
+//   2. Se Ollama non è disponibile → Anthropic direttamente
+//   3. Se Ollama risponde ma i tools erano attesi e non ne ha chiamato nessuno
+//      (stop_reason non è tool_use e ci sono tools definiti con >2 loop già fatti)
+//      → escalation ad Anthropic
+//   4. Se Ollama lancia errore HTTP → escalation ad Anthropic
+//
+// Il flag SMART_ESCALATE_ON_EMPTY_TOOLS=false disabilita l'escalation automatica
+// e lascia che Ollama risponda senza tool (a volte è corretto).
+
+const SMART_ESCALATE_ON_TOOL_FAILURE = process.env.SMART_ESCALATE_ON_TOOL_FAILURE !== 'false';
+
+async function smartCreate(params) {
+  const { tools } = params;
+  const hasTools  = tools && tools.length > 0;
+
+  // Controlla disponibilità Ollama
+  const ollamaUp = await isOllamaAvailable();
+
+  if (!ollamaUp) {
+    console.warn('[🧠 Smart] Ollama non disponibile → escalation Anthropic');
+    trackCall('smart_escalated', params.max_tokens || 1000);
+    return anthropicCreate(params);
+  }
+
+  // Prova Ollama
+  let ollamaResult;
+  try {
+    ollamaResult = await ollamaCreate(params);
+    const hasToolCalls = ollamaResult.content.some(b => b.type === 'tool_use');
+
+    // Se i tool erano attesi ma Ollama non ne ha chiamato nessuno E
+    // la risposta è molto corta (probabile fallimento silenzioso)
+    if (hasTools && !hasToolCalls && SMART_ESCALATE_ON_TOOL_FAILURE) {
+      const textContent = ollamaResult.content.find(b => b.type === 'text')?.text || '';
+      const isShort     = textContent.length < 100;
+      const looksLost   = /non so|cannot|unable|capire|errore|error/i.test(textContent);
+
+      if (isShort || looksLost) {
+        console.warn(`[🧠 Smart] Ollama ha risposto senza tool_use (testo: "${textContent.slice(0,80)}…") → escalation Anthropic`);
+        trackCall('smart_escalated', params.max_tokens || 1000);
+        return anthropicCreate(params);
+      }
+    }
+
+    // Ollama ha risposto bene — gratis ✓
+    console.log(`[🧠 Smart] Ollama OK ${hasToolCalls ? '(tool_use)' : '(text)'} — $0`);
+    trackCall('smart_local', params.max_tokens || 1000);
+    return ollamaResult;
+
+  } catch (ollamaErr) {
+    console.warn(`[🧠 Smart] Ollama errore: ${ollamaErr.message} → escalation Anthropic`);
+    trackCall('smart_escalated', params.max_tokens || 1000);
+    return anthropicCreate(params);
+  }
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
@@ -220,10 +334,11 @@ async function ollamaCreate({ max_tokens, system, messages, tools }) {
  * agent.js chiama: await llm.create({ max_tokens, system, messages, tools })
  */
 export async function create(params) {
-  if (PROVIDER === 'anthropic')  return anthropicCreate(params);
-  if (PROVIDER === 'ollama')     return ollamaCreate(params);
-  if (PROVIDER === 'trihybrid')  return trihybridCreate(params);
-  throw new Error(`[llm-provider] PROVIDER non riconosciuto: "${PROVIDER}". Usa "anthropic", "ollama" o "trihybrid".`);
+  if (PROVIDER === 'anthropic')  { trackCall('anthropic', params.max_tokens || 1000); return anthropicCreate(params); }
+  if (PROVIDER === 'ollama')     { trackCall('ollama',    params.max_tokens || 1000); return ollamaCreate(params); }
+  if (PROVIDER === 'trihybrid')  { trackCall('trihybrid', params.max_tokens || 1000); return trihybridCreate(params); }
+  if (PROVIDER === 'smart')      return smartCreate(params);
+  throw new Error(`[llm-provider] PROVIDER non riconosciuto: "${PROVIDER}". Usa "anthropic", "ollama", "trihybrid" o "smart".`);
 }
 
 /**
@@ -232,7 +347,8 @@ export async function create(params) {
 export function providerInfo() {
   if (PROVIDER === 'anthropic')  return { provider: 'anthropic', model: ANTHROPIC_MODEL };
   if (PROVIDER === 'trihybrid')  return { provider: 'trihybrid', bridge: THY_BRIDGE_URL, model: 'auto-routed' };
+  if (PROVIDER === 'smart')      return { provider: 'smart', local: OLLAMA_MODEL, cloud: ANTHROPIC_MODEL, strategy: 'ollama-first, anthropic-fallback' };
   return { provider: 'ollama', model: OLLAMA_MODEL, base: OLLAMA_BASE };
 }
 
-export default { create, providerInfo };
+export default { create, providerInfo, getSessionStats };
