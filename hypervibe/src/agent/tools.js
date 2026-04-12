@@ -8,6 +8,7 @@ import { Permissions } from '../primitives/permissions.js';
 import { Playbooks } from '../primitives/playbooks.js';
 import { Triggers, scheduleCronTrigger } from '../primitives/triggers.js';
 import { Learnings } from '../primitives/learnings.js';
+import { runSwarm, getServerStatus } from '../../tools/vibe-trading/vibe-bridge.js';
 import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -563,6 +564,53 @@ export const TOOL_DEFINITIONS = [
       required: ['content'],
     },
   },
+
+  // ── Vibe-Trading Research Bridge ──────────────────────────────────────────
+  {
+    name: 'vibe_research',
+    description: `Run deep multi-agent research using Vibe-Trading swarms.
+Use this BEFORE making high-conviction trades or when you need advanced analysis beyond standard indicators.
+
+Available swarms:
+- crypto_trading_desk: 4-agent desk (funding analyst + liquidation analyst + onchain flow analyst + risk manager). Returns executable trade plan with entry/stop/TP levels and position sizing. Requires: target (e.g. "HYPE-USDT"), timeframe ("intraday" | "swing" | "position").
+- risk_committee: 3-agent committee (drawdown analyst + tail risk analyst + regime detector) + head of risk. Returns full risk audit with VaR, CVaR, regime classification, and action items. Requires: goal (e.g. "HYPE long position 500 USDC").
+
+This calls a local Vibe-Trading API server on port 8000. If the server is not running, the tool will return an error — the user must start it first (see docs).`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        swarm: {
+          type: 'string',
+          enum: ['crypto_trading_desk', 'risk_committee'],
+          description: 'Which swarm to run',
+        },
+        target: {
+          type: 'string',
+          description: '(crypto_trading_desk only) Asset pair, e.g. "HYPE-USDT", "BTC-USDT"',
+        },
+        timeframe: {
+          type: 'string',
+          enum: ['intraday', 'swing', 'position'],
+          description: '(crypto_trading_desk only) Trading horizon',
+        },
+        goal: {
+          type: 'string',
+          description: '(risk_committee only) What to audit, e.g. "HYPE long position 500 USDC"',
+        },
+        poll_timeout_seconds: {
+          type: 'number',
+          description: 'Max seconds to wait for swarm completion (default 300)',
+        },
+      },
+      required: ['swarm'],
+    },
+  },
+
+  {
+    name: 'vibe_server_status',
+    description: 'Controlla lo stato del server Vibe-Trading (running/starting/stopped/error) e il PID del processo. Usa questo se vibe_research non risponde o prima di chiamarlo.',
+    input_schema: { type: 'object', properties: {} },
+  },
 ];
 
 // ── Tool handler ──────────────────────────────────────────────────────────────
@@ -701,6 +749,28 @@ export async function handleTool(name, input, { api, signer, walletAddress, vaul
       });
       return { logged: true, id };
     }
+
+    // ── Vibe-Trading Research Bridge ────────────────────────────────────────
+    case 'vibe_research': {
+      const swarm   = input.swarm;
+      const timeout = input.poll_timeout_seconds || 300;
+
+      // Costruisci user_vars in base allo swarm
+      let userVars = {};
+      if (swarm === 'crypto_trading_desk') {
+        userVars = { target: input.target, timeframe: input.timeframe };
+      } else if (swarm === 'risk_committee') {
+        userVars = { goal: input.goal };
+      }
+
+      // Delega tutto a vibe-bridge.js (gestisce avvio server, polling, cleanup)
+      return await runSwarm(swarm, userVars, { timeoutSeconds: timeout });
+    }
+
+    case 'vibe_server_status': {
+      return getServerStatus();
+    }
+
 
     default:
       throw new Error(`Unknown tool: ${name}`);
