@@ -556,7 +556,7 @@ if exist "%LLMFIT_PS%" del "%LLMFIT_PS%"
 >>"%LLMFIT_PS%" echo function Map-ToOllama($name) {
 >>"%LLMFIT_PS%" echo     $n = $name.ToLower()
 >>"%LLMFIT_PS%" echo     # Salta modelli AWQ/GPTQ/MLX — non compatibili con Ollama
->>"%LLMFIT_PS%" echo     if ($n -match 'awq|gptq|mlx') { return $null }
+>>"%LLMFIT_PS%" echo     if ($n -match 'awq^|gptq^|mlx') { return $null }
 >>"%LLMFIT_PS%" echo     # Qwen2.5 Coder
 >>"%LLMFIT_PS%" echo     if ($n -match 'qwen2\.5-coder.*?(\d+)b') { return "qwen2.5-coder:$($Matches[1])b" }
 >>"%LLMFIT_PS%" echo     # Qwen2.5
@@ -592,7 +592,7 @@ if exist "%LLMFIT_PS%" del "%LLMFIT_PS%"
 >>"%LLMFIT_PS%" echo $score = [math]::Round($best.score, 1)
 >>"%LLMFIT_PS%" echo $tps   = [math]::Round($best.estimated_tps, 1)
 >>"%LLMFIT_PS%" echo $ram   = [math]::Round($best.memory_required_gb, 1)
->>"%LLMFIT_PS%" echo Write-Output "$bestTag|$($best.name)|$score|$tps|$ram|$($best.fit_level)|$($best.best_quant)"
+>>"%LLMFIT_PS%" echo Write-Output "$bestTag~$($best.name)~$score~$tps~$ram~$($best.fit_level)~$($best.best_quant)"
 
 set LLMFIT_RESULT=
 for /f "delims=" %%R in ('powershell -NoProfile -ExecutionPolicy Bypass -File "%LLMFIT_PS%" 2^>nul') do set LLMFIT_RESULT=%%R
@@ -607,7 +607,7 @@ if "!LLMFIT_RESULT!"=="" (
 )
 
 REM Estrai i campi (pipe-delimitati)
-for /f "tokens=1,2,3,4,5,6,7 delims=|" %%A in ("!LLMFIT_RESULT!") do (
+for /f "tokens=1,2,3,4,5,6,7 delims=~" %%A in ("!LLMFIT_RESULT!") do (
     set LLMFIT_TAG=%%A
     set LLMFIT_NAME=%%B
     set LLMFIT_SCORE=%%C
