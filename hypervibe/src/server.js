@@ -21,6 +21,7 @@ import { Learnings } from './primitives/learnings.js';
 import { Skills } from './primitives/skills.js';
 import { initTelegram, isTelegramConfigured, sendApprovalMessage, sendExecutionNotification, sendNotification, stopTelegram } from './primitives/telegram.js';
 import { runAgent, runReasoningJob } from './agent/agent.js';
+import { getSessionStats } from './agent/llm-provider.js';
 import { executeApprovedOrder, testSigner } from './agent/tools.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -220,6 +221,12 @@ export async function createApp(config) {
       network: runtime.network,
       hasSigner: Boolean(runtime.signer),
     });
+
+  // GET cost-stats — utilizzo provider e costi stimati della sessione corrente
+  app.get('/api/cost-stats', (_req, res) => {
+    res.json(getSessionStats());
+  });
+
   });
 
   // GET settings — returns current config with masked key previews
