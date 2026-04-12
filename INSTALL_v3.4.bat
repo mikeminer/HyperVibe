@@ -499,25 +499,52 @@ if %errorlevel% equ 0 (
     if %errorlevel% equ 0 goto LLMFIT_RUN
 )
 
-REM Fallback: download diretto del binario da GitHub Releases
-echo  [*] Scoop non trovato. Download binario llmfit...
-set LLMFIT_URL=https://github.com/AlexsJones/llmfit/releases/latest/download/llmfit-x86_64-pc-windows-msvc.zip
-set LLMFIT_ZIP=%TMP_DIR%\llmfit.zip
-set LLMFIT_BIN=%TMP_DIR%\llmfit.exe
+REM Fallback: download diretto del binario via PowerShell (legge versione da GitHub API)
+echo  [*] Scoop non trovato. Download binario llmfit da GitHub Releases...
 
-curl -L --progress-bar -o "%LLMFIT_ZIP%" "%LLMFIT_URL%"
-if %errorlevel% neq 0 (
-    echo  ERRORE: Download llmfit fallito. Continuo con selezione manuale.
+set LLMFIT_EXTRACT=%TMP_DIR%\llmfit_extracted
+set LLMFIT_PS_DL=%TMP_DIR%\llmfit_download.ps1
+(
+    echo $ErrorActionPreference = 'Stop'
+    echo try {
+    echo     $rel = Invoke-RestMethod 'https://api.github.com/repos/AlexsJones/llmfit/releases/latest' -Headers @{'User-Agent'='HyperVibe-Installer'}
+    echo     $asset = $rel.assets ^| Where-Object { $_.name -like '*x86_64-pc-windows-msvc.zip' } ^| Select-Object -First 1
+    echo     if (-not $asset) { throw 'Asset Windows non trovato nella release' }
+    echo     $zip = Join-Path $env:TEMP 'hypervibe_install\llmfit.zip'
+    echo     $extract = Join-Path $env:TEMP 'hypervibe_install\llmfit_extracted'
+    echo     Write-Host "  Download: $($asset.name)"
+    echo     Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $zip -UseBasicParsing
+    echo     if (Test-Path $extract) { Remove-Item $extract -Recurse -Force }
+    echo     Expand-Archive -Path $zip -DestinationPath $extract -Force
+    echo     $exe = Get-ChildItem $extract -Recurse -Filter 'llmfit.exe' ^| Select-Object -First 1
+    echo     if (-not $exe) { throw 'llmfit.exe non trovato nellarchivio' }
+    echo     Write-Host "LLMFIT_EXE_PATH=$($exe.FullName)"
+    echo } catch {
+    echo     Write-Host "LLMFIT_DOWNLOAD_ERROR=$($_.Exception.Message)"
+    echo }
+) > "%LLMFIT_PS_DL%"
+
+set LLMFIT_EXE_PATH=
+set LLMFIT_DOWNLOAD_ERROR=
+for /f "tokens=1,* delims==" %%A in ('powershell -NoProfile -ExecutionPolicy Bypass -File "%LLMFIT_PS_DL%" 2^>nul') do (
+    if "%%A"=="LLMFIT_EXE_PATH"      set LLMFIT_EXE_PATH=%%B
+    if "%%A"=="LLMFIT_DOWNLOAD_ERROR" set LLMFIT_DOWNLOAD_ERROR=%%B
+)
+
+if not "!LLMFIT_DOWNLOAD_ERROR!"=="" (
+    echo  ERRORE download: !LLMFIT_DOWNLOAD_ERROR!
+    echo  Continuo con selezione manuale.
+    goto AI_LOCAL_MENU
+)
+if "!LLMFIT_EXE_PATH!"=="" (
+    echo  ERRORE: llmfit.exe non trovato dopo l'estrazione. Continuo con selezione manuale.
     goto AI_LOCAL_MENU
 )
 
-powershell -Command "Expand-Archive -Path '%LLMFIT_ZIP%' -DestinationPath '%TMP_DIR%\llmfit_extracted' -Force" >nul 2>&1
-for /f "delims=" %%F in ('dir /b /s "%TMP_DIR%\llmfit_extracted\*.exe" 2^>nul') do set LLMFIT_BIN=%%F
-if not exist "!LLMFIT_BIN!" (
-    echo  ERRORE: Binario llmfit non trovato nell'archivio. Continuo con selezione manuale.
-    goto AI_LOCAL_MENU
-)
-set "PATH=!TMP_DIR!\llmfit_extracted;!PATH!"
+REM Aggiunge la cartella del binario al PATH temporaneo
+for %%D in ("!LLMFIT_EXE_PATH!") do set "LLMFIT_DIR=%%~dpD"
+set "PATH=!LLMFIT_DIR!;!PATH!"
+echo  OK - llmfit trovato: !LLMFIT_EXE_PATH!
 
 REM Verifica finale
 llmfit --version >nul 2>&1
