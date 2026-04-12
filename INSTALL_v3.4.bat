@@ -486,67 +486,50 @@ echo   LLMFIT - Analisi automatica hardware in corso...
 echo  ========================================================
 echo.
 
+set LLMFIT_ZIP=%TMP_DIR%\llmfit.zip
+set LLMFIT_EXTRACT=%TMP_DIR%\llmfit_ext
+set LLMFIT_PATH_FILE=%TMP_DIR%\llmfit_exe_path.txt
+set LLMFIT_OUT=%TMP_DIR%\llmfit_rec.json
+
 REM Verifica se llmfit e' gia' disponibile
 llmfit --version >nul 2>&1
 if %errorlevel% equ 0 goto LLMFIT_RUN
 
-REM Prova installazione via Scoop (metodo preferito su Windows)
+REM Prova installazione via Scoop
 scoop --version >nul 2>&1
 if %errorlevel% equ 0 (
     echo  [*] Installazione llmfit via Scoop...
-    scoop install llmfit
+    scoop install llmfit >nul 2>&1
     llmfit --version >nul 2>&1
     if %errorlevel% equ 0 goto LLMFIT_RUN
 )
 
-REM Fallback: download diretto del binario via PowerShell (legge versione da GitHub API)
-echo  [*] Scoop non trovato. Download binario llmfit da GitHub Releases...
+REM Fallback: download binario via PowerShell con GitHub API
+echo  [*] Download llmfit da GitHub Releases...
+if exist "%LLMFIT_EXTRACT%" rmdir /s /q "%LLMFIT_EXTRACT%" >nul 2>&1
 
-set LLMFIT_EXTRACT=%TMP_DIR%\llmfit_extracted
-set LLMFIT_PS_DL=%TMP_DIR%\llmfit_download.ps1
-(
-    echo $ErrorActionPreference = 'Stop'
-    echo try {
-    echo     $rel = Invoke-RestMethod 'https://api.github.com/repos/AlexsJones/llmfit/releases/latest' -Headers @{'User-Agent'='HyperVibe-Installer'}
-    echo     $asset = $rel.assets ^| Where-Object { $_.name -like '*x86_64-pc-windows-msvc.zip' } ^| Select-Object -First 1
-    echo     if (-not $asset) { throw 'Asset Windows non trovato nella release' }
-    echo     $zip = Join-Path $env:TEMP 'hypervibe_install\llmfit.zip'
-    echo     $extract = Join-Path $env:TEMP 'hypervibe_install\llmfit_extracted'
-    echo     Write-Host "  Download: $($asset.name)"
-    echo     Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $zip -UseBasicParsing
-    echo     if (Test-Path $extract) { Remove-Item $extract -Recurse -Force }
-    echo     Expand-Archive -Path $zip -DestinationPath $extract -Force
-    echo     $exe = Get-ChildItem $extract -Recurse -Filter 'llmfit.exe' ^| Select-Object -First 1
-    echo     if (-not $exe) { throw 'llmfit.exe non trovato nellarchivio' }
-    echo     Write-Host "LLMFIT_EXE_PATH=$($exe.FullName)"
-    echo } catch {
-    echo     Write-Host "LLMFIT_DOWNLOAD_ERROR=$($_.Exception.Message)"
-    echo }
-) > "%LLMFIT_PS_DL%"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $r = Invoke-RestMethod 'https://api.github.com/repos/AlexsJones/llmfit/releases/latest' -Headers @{'User-Agent'='HyperVibe'}; $a = $r.assets | Where-Object { $_.name -like '*x86_64-pc-windows-msvc.zip' } | Select-Object -First 1; if (-not $a) { throw 'asset non trovato' }; Write-Host ('  Download: ' + $a.name); Invoke-WebRequest $a.browser_download_url -OutFile '%LLMFIT_ZIP%' -UseBasicParsing; Expand-Archive '%LLMFIT_ZIP%' '%LLMFIT_EXTRACT%' -Force; $e = (Get-ChildItem '%LLMFIT_EXTRACT%' -Recurse -Filter llmfit.exe | Select-Object -First 1).FullName; Set-Content '%LLMFIT_PATH_FILE%' $e } catch { Set-Content '%LLMFIT_PATH_FILE%' ('ERROR:' + $_.Exception.Message) }"
 
-set LLMFIT_EXE_PATH=
-set LLMFIT_DOWNLOAD_ERROR=
-for /f "tokens=1,* delims==" %%A in ('powershell -NoProfile -ExecutionPolicy Bypass -File "%LLMFIT_PS_DL%" 2^>nul') do (
-    if "%%A"=="LLMFIT_EXE_PATH"      set LLMFIT_EXE_PATH=%%B
-    if "%%A"=="LLMFIT_DOWNLOAD_ERROR" set LLMFIT_DOWNLOAD_ERROR=%%B
+if not exist "%LLMFIT_PATH_FILE%" (
+    echo  ERRORE: download fallito. Continuo con selezione manuale.
+    goto AI_LOCAL_MENU
 )
 
-if not "!LLMFIT_DOWNLOAD_ERROR!"=="" (
-    echo  ERRORE download: !LLMFIT_DOWNLOAD_ERROR!
+set /p LLMFIT_EXE_PATH=<"%LLMFIT_PATH_FILE%"
+if "!LLMFIT_EXE_PATH:~0,6!"=="ERROR:" (
+    echo  ERRORE: !LLMFIT_EXE_PATH!
     echo  Continuo con selezione manuale.
     goto AI_LOCAL_MENU
 )
 if "!LLMFIT_EXE_PATH!"=="" (
-    echo  ERRORE: llmfit.exe non trovato dopo l'estrazione. Continuo con selezione manuale.
+    echo  ERRORE: llmfit.exe non trovato. Continuo con selezione manuale.
     goto AI_LOCAL_MENU
 )
 
-REM Aggiunge la cartella del binario al PATH temporaneo
 for %%D in ("!LLMFIT_EXE_PATH!") do set "LLMFIT_DIR=%%~dpD"
 set "PATH=!LLMFIT_DIR!;!PATH!"
-echo  OK - llmfit trovato: !LLMFIT_EXE_PATH!
+echo  OK - llmfit: !LLMFIT_EXE_PATH!
 
-REM Verifica finale
 llmfit --version >nul 2>&1
 if %errorlevel% neq 0 (
     echo  ERRORE: llmfit non eseguibile. Continuo con selezione manuale.
@@ -554,66 +537,49 @@ if %errorlevel% neq 0 (
 )
 
 :LLMFIT_RUN
-echo  [*] Analisi hardware e raccomandazione modelli in corso...
-echo      (richiede pochi secondi)
+echo  [*] Analisi hardware in corso... (pochi secondi)
 echo.
 
-REM Esegui llmfit e salva JSON
-set LLMFIT_OUT=%TMP_DIR%\llmfit_rec.json
 llmfit recommend --use-case general -n 3 > "%LLMFIT_OUT%" 2>nul
 if %errorlevel% neq 0 (
     echo  ERRORE: llmfit recommend fallito. Continuo con selezione manuale.
     goto AI_LOCAL_MENU
 )
 
-REM Parsing JSON e mapping a tag Ollama via PowerShell
+REM Script PowerShell di parsing — scritto riga per riga con >> per evitare crash da parentesi
 set LLMFIT_PS=%TMP_DIR%\llmfit_parse.ps1
-(
-    echo $json = Get-Content '%LLMFIT_OUT%' -Raw ^| ConvertFrom-Json
-    echo $models = $json.models
-    echo if ^(-not $models -or $models.Count -eq 0^) { Write-Output 'NOMODEL'; exit }
-    echo.
-    echo function Map-ToOllama($name) {
-    echo     $n = $name.ToLower()
-    echo     if ($n -match 'qwen2\.5-coder.*?(\d+)b') { return "qwen2.5-coder:$($Matches[1])b" }
-    echo     if ($n -match 'qwen2\.5.*?(\d+\.?\d*)b') { $s=$Matches[1]; return "qwen2.5:${s}b" }
-    echo     if ($n -match 'qwen3.*?(\d+)b') { return "qwen3:$($Matches[1])b" }
-    echo     if ($n -match 'llama.?3\.3.*?(\d+)b') { return "llama3.3:$($Matches[1])b" }
-    echo     if ($n -match 'llama.?3\.2.*?(\d+)b') { return "llama3.2:$($Matches[1])b" }
-    echo     if ($n -match 'llama.?3\.1.*?(\d+)b') { return "llama3.1:$($Matches[1])b" }
-    echo     if ($n -match 'gemma.?4.*?(\d+)b') { return "gemma4:$($Matches[1])b" }
-    echo     if ($n -match 'gemma.?3.*?(\d+)b') { return "gemma3:$($Matches[1])b" }
-    echo     if ($n -match 'phi.?4.?mini') { return "phi4-mini" }
-    echo     if ($n -match 'phi.?4.*?(\d+)b') { return "phi4:$($Matches[1])b" }
-    echo     if ($n -match 'mistral.?nemo') { return "mistral-nemo" }
-    echo     if ($n -match 'mistral.*?7b') { return "mistral:7b" }
-    echo     if ($n -match 'granite.*?8b') { return "granite3.2:8b" }
-    echo     return $null
-    echo }
-    echo.
-    echo $best = $null
-    echo $bestTag = $null
-    echo foreach ($m in $models) {
-    echo     $tag = Map-ToOllama $m.name
-    echo     if ($tag -and -not $bestTag) {
-    echo         $best = $m
-    echo         $bestTag = $tag
-    echo     }
-    echo }
-    echo.
-    echo if (-not $bestTag) {
-    echo     # Fallback: usa il top modello anche senza mapping esatto
-    echo     $best = $models[0]
-    echo     $bestTag = 'NOMATCH'
-    echo }
-    echo.
-    echo $score = [math]::Round($best.score, 1)
-    echo $tps   = [math]::Round($best.estimated_tps, 1)
-    echo $ram   = [math]::Round($best.memory_required_gb, 1)
-    echo $fit   = $best.fit_level
-    echo $quant = $best.best_quant
-    echo Write-Output "$bestTag|$($best.name)|$score|$tps|$ram|$fit|$quant"
-) > "%LLMFIT_PS%"
+if exist "%LLMFIT_PS%" del "%LLMFIT_PS%"
+
+>>"%LLMFIT_PS%" echo $json = Get-Content '%LLMFIT_OUT%' -Raw ^| ConvertFrom-Json
+>>"%LLMFIT_PS%" echo $models = $json.models
+>>"%LLMFIT_PS%" echo if (-not $models -or $models.Count -eq 0) { Write-Output 'NOMODEL'; exit }
+>>"%LLMFIT_PS%" echo function Map-ToOllama($name) {
+>>"%LLMFIT_PS%" echo     $n = $name.ToLower()
+>>"%LLMFIT_PS%" echo     if ($n -match 'qwen2\.5-coder.*?(\d+)b') { return "qwen2.5-coder:$($Matches[1])b" }
+>>"%LLMFIT_PS%" echo     if ($n -match 'qwen2\.5.*?(\d+\.?\d*)b') { $s=$Matches[1]; if ($s -eq '0.5') { return 'qwen2.5:0.5b' }; return "qwen2.5:${s}b" }
+>>"%LLMFIT_PS%" echo     if ($n -match 'qwen3.*?(\d+)b') { return "qwen3:$($Matches[1])b" }
+>>"%LLMFIT_PS%" echo     if ($n -match 'llama.?3\.3.*?(\d+)b') { return "llama3.3:$($Matches[1])b" }
+>>"%LLMFIT_PS%" echo     if ($n -match 'llama.?3\.2.*?(\d+)b') { return "llama3.2:$($Matches[1])b" }
+>>"%LLMFIT_PS%" echo     if ($n -match 'llama.?3\.1.*?(\d+)b') { return "llama3.1:$($Matches[1])b" }
+>>"%LLMFIT_PS%" echo     if ($n -match 'gemma.?4.*?(\d+)b') { return "gemma4:$($Matches[1])b" }
+>>"%LLMFIT_PS%" echo     if ($n -match 'gemma.?3.*?(\d+)b') { return "gemma3:$($Matches[1])b" }
+>>"%LLMFIT_PS%" echo     if ($n -match 'phi.?4.?mini') { return 'phi4-mini' }
+>>"%LLMFIT_PS%" echo     if ($n -match 'phi.?4.*?(\d+)b') { return "phi4:$($Matches[1])b" }
+>>"%LLMFIT_PS%" echo     if ($n -match 'mistral.?nemo') { return 'mistral-nemo' }
+>>"%LLMFIT_PS%" echo     if ($n -match 'mistral.*?7b') { return 'mistral:7b' }
+>>"%LLMFIT_PS%" echo     if ($n -match 'granite.*?8b') { return 'granite3.2:8b' }
+>>"%LLMFIT_PS%" echo     return $null
+>>"%LLMFIT_PS%" echo }
+>>"%LLMFIT_PS%" echo $bestTag = $null; $best = $null
+>>"%LLMFIT_PS%" echo foreach ($m in $models) {
+>>"%LLMFIT_PS%" echo     $tag = Map-ToOllama $m.name
+>>"%LLMFIT_PS%" echo     if ($tag -and -not $bestTag) { $best = $m; $bestTag = $tag }
+>>"%LLMFIT_PS%" echo }
+>>"%LLMFIT_PS%" echo if (-not $bestTag) { $best = $models[0]; $bestTag = 'NOMATCH' }
+>>"%LLMFIT_PS%" echo $score = [math]::Round($best.score, 1)
+>>"%LLMFIT_PS%" echo $tps   = [math]::Round($best.estimated_tps, 1)
+>>"%LLMFIT_PS%" echo $ram   = [math]::Round($best.memory_required_gb, 1)
+>>"%LLMFIT_PS%" echo Write-Output "$bestTag|$($best.name)|$score|$tps|$ram|$($best.fit_level)|$($best.best_quant)"
 
 set LLMFIT_RESULT=
 for /f "delims=" %%R in ('powershell -NoProfile -ExecutionPolicy Bypass -File "%LLMFIT_PS%" 2^>nul') do set LLMFIT_RESULT=%%R
@@ -627,7 +593,7 @@ if "!LLMFIT_RESULT!"=="" (
     goto AI_LOCAL_MENU
 )
 
-REM Estrai i campi dal risultato pipe-delimitato
+REM Estrai i campi (pipe-delimitati)
 for /f "tokens=1,2,3,4,5,6,7 delims=|" %%A in ("!LLMFIT_RESULT!") do (
     set LLMFIT_TAG=%%A
     set LLMFIT_NAME=%%B
@@ -638,15 +604,12 @@ for /f "tokens=1,2,3,4,5,6,7 delims=|" %%A in ("!LLMFIT_RESULT!") do (
     set LLMFIT_QUANT=%%G
 )
 
-REM Mostra raccomandazione
 echo  ========================================================
 echo   RACCOMANDAZIONE LLMFIT
 echo  ========================================================
 echo.
 echo   Modello      : !LLMFIT_NAME!
-if not "!LLMFIT_TAG!"=="NOMATCH" (
-    echo   Ollama tag   : !LLMFIT_TAG!
-)
+if not "!LLMFIT_TAG!"=="NOMATCH" echo   Ollama tag   : !LLMFIT_TAG!
 echo   Score        : !LLMFIT_SCORE!/100
 echo   Stima tok/s  : ~!LLMFIT_TPS! t/s
 echo   RAM richiesta: !LLMFIT_RAM! GB
@@ -655,22 +618,20 @@ echo   Quantiz.     : !LLMFIT_QUANT!
 echo.
 
 if "!LLMFIT_TAG!"=="NOMATCH" (
-    echo  ATTENZIONE: modello "!LLMFIT_NAME!" non ha un tag Ollama mappato.
-    echo  Puoi inserire manualmente il tag corretto oppure tornare al menu.
-    echo.
-    set /p CUSTOM_TAG="  Tag Ollama da usare (o INVIO per menu manuale): "
+    echo  ATTENZIONE: "!LLMFIT_NAME!" non ha un tag Ollama mappato.
+    set /p CUSTOM_TAG="  Tag Ollama manuale (o INVIO per menu): "
     if "!CUSTOM_TAG!"=="" goto AI_LOCAL_MENU
     set OLLAMA_MODEL=!CUSTOM_TAG!
     set FORCE_UPDATE_OLLAMA=0
     goto LOCAL_OK
 )
 
-set /p LLMFIT_CONFIRM="  Usare !LLMFIT_TAG! come consigliato? (S/N - N per menu manuale): "
+set /p LLMFIT_CONFIRM="  Usare !LLMFIT_TAG! come consigliato? (S/N): "
 if /i "!LLMFIT_CONFIRM!"=="N" goto AI_LOCAL_MENU
 
 set OLLAMA_MODEL=!LLMFIT_TAG!
 set FORCE_UPDATE_OLLAMA=0
-echo  OK - Selezionato: !OLLAMA_MODEL! (raccomandato da llmfit, score !LLMFIT_SCORE!)
+echo  OK - Selezionato: !OLLAMA_MODEL! (score !LLMFIT_SCORE!)
 
 :LOCAL_OK
 set PROVIDER=ollama
